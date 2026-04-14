@@ -1,293 +1,1459 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Patent Application Scheduler</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f4f0;color:#1a1a18;min-height:100vh;padding:1.5rem;}
-.card{background:#fff;border:0.5px solid rgba(0,0,0,0.12);border-radius:12px;}
-input,button{font-family:inherit;}
-input{background:#f5f4f0;border:0.5px solid rgba(0,0,0,0.22);color:#1a1a18;padding:7px 10px;border-radius:8px;font-size:13px;outline:none;width:100%;}
-input:focus{border-color:rgba(0,0,0,0.4);}
-input[type=date]{font-family:'Courier New',monospace;}
-input::placeholder{color:#888780;}
-button{cursor:pointer;transition:opacity .12s;}
-button:hover:not(:disabled){opacity:.7;}
-button:disabled{opacity:.35;cursor:default;}
-.mono{font-family:'Courier New',monospace;}
-.muted{color:#5f5e5a;}
-.wrap{max-width:960px;margin:0 auto;}
-.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:.75rem;}
-.stat{background:#f5f4f0;border-radius:8px;padding:10px 12px;}
-.stat-l{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#5f5e5a;margin-bottom:4px;}
-.stat-v{font-size:20px;font-weight:500;}
-.stat.alarm .stat-l{color:#a32d2d;}
-.stat.alarm .stat-v{color:#a32d2d;}
-.layout{display:flex;gap:14px;align-items:flex-start;}
-.main{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:10px;}
-.side{width:268px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;}
-.hdr{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:.75rem;border-bottom:.5px solid rgba(0,0,0,0.1);margin-bottom:.75rem;}
-.badge-ok{background:#eaf3de;color:#3b6d11;padding:3px 9px;border-radius:8px;font-size:12px;font-weight:500;}
-.badge-warn{background:#faeeda;color:#854f0b;padding:3px 9px;border-radius:8px;font-size:12px;font-weight:500;}
-.badge-bad{background:#fcebeb;color:#a32d2d;padding:3px 9px;border-radius:8px;font-size:12px;font-weight:500;}
-.q-row{padding:11px 14px;border-bottom:.5px solid rgba(0,0,0,0.08);display:flex;align-items:center;gap:8px;}
-.q-num{width:22px;height:22px;border-radius:50%;background:#f5f4f0;border:.5px solid rgba(0,0,0,0.15);display:flex;align-items:center;justify-content:center;font-size:11px;color:#5f5e5a;flex-shrink:0;}
-.q-name{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.q-sub{font-size:11px;color:#5f5e5a;margin-top:1px;}
-.q-sub .lt{color:#a32d2d;}
-.q-rm{background:none;border:none;color:#b4b2a9;font-size:17px;padding:2px 4px;}
-.arr{display:flex;flex-direction:column;gap:1px;flex-shrink:0;}
-.arr button{background:none;border:none;color:#b4b2a9;font-size:11px;padding:1px 3px;line-height:1;}
-.q-empty{padding:28px 14px;text-align:center;color:#5f5e5a;font-size:13px;}
-.panel-hdr{padding:10px 14px;border-bottom:.5px solid rgba(0,0,0,0.08);display:flex;justify-content:space-between;align-items:center;}
-.panel-ttl{font-weight:500;font-size:14px;}
-.add-card{padding:12px;}
-.add-card .lbl{font-size:10px;color:#5f5e5a;letter-spacing:2px;margin-bottom:2px;}
-.add-btn{background:#f5f4f0;border:.5px solid rgba(0,0,0,0.18);color:#5f5e5a;padding:8px;border-radius:8px;font-size:13px;font-weight:500;width:100%;margin-top:4px;}
-.add-btn.ready{background:#1a1a18;color:#fff;border-color:transparent;}
-.cal-card{padding:12px;}
-.cal-lbl{font-size:13px;font-weight:500;text-align:center;}
-.cal-nav{background:none;border:none;color:#5f5e5a;font-size:16px;padding:0 5px;line-height:1;}
-.cal-nav-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;}
-.cal-hint{font-size:10px;color:#5f5e5a;text-align:center;margin-bottom:6px;}
-.cal-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px;}
-.cal-dow span{text-align:center;font-size:10px;color:#5f5e5a;padding:1px 0;}
-.cal-dow span.wknd{color:#b4b2a9;}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
-.cal-cell{background:transparent;border:.5px solid transparent;border-radius:4px;color:#1a1a18;padding:4px 2px;font-size:11px;cursor:pointer;text-align:center;line-height:1.3;}
-.cal-cell.wknd{color:#b4b2a9;cursor:default;}
-.cal-cell.ooo{background:#fcebeb;color:#a32d2d;}
-.cal-cell.booked{background:#e6f1fb;color:#185fa5;}
-.cal-cell.today{border:.5px solid #ba7517 !important;font-weight:500;}
-.cal-legend{display:flex;gap:12px;font-size:10px;color:#5f5e5a;margin-top:8px;}
-.leg-dot{display:inline-block;width:9px;height:9px;border-radius:2px;vertical-align:middle;margin-right:3px;}
-.cal-footer{margin-top:7px;display:flex;justify-content:space-between;align-items:center;}
-.clr-btn{background:none;border:none;color:#5f5e5a;font-size:11px;}
-.sim-tog-btn{width:100%;padding:10px 14px;background:none;border:none;color:#1a1a18;display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:500;text-align:left;}
-.sim-body{display:none;border-top:.5px solid rgba(0,0,0,0.08);padding:12px 14px;}
-.sim-inner{background:#f5f4f0;border:.5px solid rgba(0,0,0,0.1);border-radius:12px;padding:12px;}
-.sim-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:.5px solid rgba(0,0,0,0.08);}
-.sim-vd{font-size:12px;border-radius:8px;padding:7px 10px;margin-top:8px;}
-.sim-vd.ok{background:#eaf3de;color:#3b6d11;}
-.sim-vd.bad{background:#fcebeb;color:#a32d2d;}
-.sim-vd.warn{background:#faeeda;color:#854f0b;}
-.conf-wrap{background:#fcebeb;border:.5px solid rgba(163,45,45,0.35);border-radius:12px;padding:14px 16px;margin-top:10px;}
-.conf-ttl{font-size:15px;font-weight:500;color:#a32d2d;margin-bottom:6px;}
-.conf-sub{font-size:12px;color:#a32d2d;opacity:.85;margin-bottom:10px;}
-.conf-item{background:#fff;border:.5px solid rgba(163,45,45,0.3);border-radius:8px;padding:10px 12px;margin-bottom:7px;}
-.conf-nm{font-weight:500;font-size:14px;margin-bottom:5px;}
-.conf-txt{font-size:12px;color:#5f5e5a;display:flex;flex-wrap:wrap;gap:7px;align-items:center;}
-.prio-btn{background:#1a1a18;color:#fff;border:none;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:500;flex-shrink:0;}
-.ord-lbl{color:#5f5e5a;font-size:10px;letter-spacing:2px;}
-.rst-btn{background:none;border:.5px solid rgba(0,0,0,0.18);color:#5f5e5a;padding:2px 8px;border-radius:8px;font-size:11px;}
-@media(max-width:680px){
-  .stats{grid-template-columns:repeat(2,1fr);}
-  .stats .stat:last-child{grid-column:span 2;}
-  .layout{flex-direction:column;}
-  .side{width:100%;}
-}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Patent Workflow Scheduler</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #11182c;
+      --panel-2: #17203a;
+      --panel-3: #1f2b4b;
+      --text: #e8edf7;
+      --muted: #9aa8c7;
+      --line: rgba(255,255,255,0.08);
+      --green: #19c37d;
+      --green-2: #0f9f64;
+      --amber: #f4b740;
+      --red: #ef5f67;
+      --blue: #6ea8fe;
+      --shadow: 0 16px 40px rgba(0,0,0,0.35);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: radial-gradient(circle at top, #111935, var(--bg) 42%); color: var(--text); font-family: var(--font); }
+    body { min-height: 100vh; }
+    button, input, select, textarea { font: inherit; }
+
+    .app-shell {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    .hero {
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.8rem, 2.5vw, 2.8rem);
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+    }
+
+    .hero p {
+      margin: 0;
+      max-width: 760px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
+      gap: 22px;
+      align-items: start;
+    }
+
+    .main-col, .sidebar {
+      display: grid;
+      gap: 22px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .today-card {
+      background: linear-gradient(155deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)), linear-gradient(135deg, #0f1730 0%, #152145 55%, #1c2b53 100%);
+      padding: 22px;
+      border-radius: calc(var(--radius) + 4px);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: var(--shadow);
+    }
+
+    .today-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 0.72rem;
+      color: #b8c6eb;
+      margin-bottom: 10px;
+    }
+
+    .today-title {
+      margin: 0;
+      font-size: clamp(1.4rem, 2vw, 2.2rem);
+      letter-spacing: -0.03em;
+      line-height: 1.08;
+    }
+
+    .today-meta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 12px 0 16px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      font-size: 0.92rem;
+    }
+
+    .chip.green { background: rgba(25, 195, 125, 0.16); color: #d8fff0; border-color: rgba(25,195,125,0.35); }
+    .chip.amber { background: rgba(244, 183, 64, 0.16); color: #fff0c6; border-color: rgba(244,183,64,0.35); }
+    .chip.red { background: rgba(239, 95, 103, 0.16); color: #ffd8da; border-color: rgba(239,95,103,0.35); }
+    .chip.blue { background: rgba(110, 168, 254, 0.16); color: #dce9ff; border-color: rgba(110,168,254,0.35); }
+
+    .today-copy {
+      color: #dae3f7;
+      line-height: 1.6;
+      margin: 0 0 18px;
+      max-width: 82ch;
+    }
+
+    .today-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .btn {
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .btn:hover { transform: translateY(-1px); background: rgba(255,255,255,0.1); }
+    .btn:active { transform: translateY(0); }
+    .btn.primary { background: linear-gradient(135deg, var(--green), var(--green-2)); color: #08160e; border: none; font-weight: 700; }
+    .btn.secondary { background: rgba(110, 168, 254, 0.14); border-color: rgba(110,168,254,0.3); }
+    .btn.danger { background: rgba(239,95,103,0.12); border-color: rgba(239,95,103,0.3); }
+    .btn.ghost { background: transparent; }
+    .btn.small { padding: 8px 11px; font-size: 0.92rem; border-radius: 10px; }
+
+    .progress {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .stage-pill {
+      border-radius: 10px;
+      padding: 10px 8px;
+      text-align: center;
+      font-size: 0.82rem;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.045);
+      color: var(--muted);
+      min-height: 44px;
+      display: grid;
+      place-items: center;
+      font-weight: 600;
+    }
+
+    .stage-pill.done { background: rgba(25,195,125,0.18); color: #d8fff0; border-color: rgba(25,195,125,0.33); }
+    .stage-pill.current { background: rgba(244,183,64,0.18); color: #fff0c6; border-color: rgba(244,183,64,0.33); }
+    .stage-pill.pending { background: rgba(255,255,255,0.03); }
+
+    .warning {
+      border: 1px solid rgba(239,95,103,0.35);
+      background: linear-gradient(180deg, rgba(239,95,103,0.14), rgba(239,95,103,0.08));
+    }
+
+    .warning h3, .panel h2 {
+      margin: 0 0 10px;
+      font-size: 1.08rem;
+      letter-spacing: -0.02em;
+    }
+
+    .warning ul {
+      margin: 12px 0 0;
+      padding-left: 18px;
+      color: #ffdfe1;
+      line-height: 1.55;
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .panel-head p, .muted {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 0.95rem;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 10px;
+    }
+
+    .date-group {
+      margin-top: 8px;
+    }
+
+    .date-label {
+      position: sticky;
+      top: 8px;
+      z-index: 2;
+      width: fit-content;
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: rgba(11,16,32,0.88);
+      border: 1px solid rgba(255,255,255,0.06);
+      font-size: 0.82rem;
+      color: #c6d4f1;
+      margin-bottom: 10px;
+      backdrop-filter: blur(8px);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.07);
+      background: rgba(255,255,255,0.03);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .row:hover { background: rgba(255,255,255,0.05); }
+    .row-left { min-width: 0; }
+    .row-title {
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-bottom: 6px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .matter {
+      font-feature-settings: "tnum" 1;
+      font-variant-numeric: tabular-nums;
+      color: #fbfdff;
+    }
+
+    .stage-name { color: #cfd9ef; }
+    .row-sub {
+      color: var(--muted);
+      font-size: 0.94rem;
+      line-height: 1.45;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .row-right {
+      display: grid;
+      align-content: center;
+      justify-items: end;
+      gap: 8px;
+      text-align: right;
+    }
+
+    .hint {
+      font-size: 0.88rem;
+      opacity: 0;
+      transform: translateY(2px);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+
+    .row.clickable-future,
+    .row.clickable-done { cursor: pointer; }
+
+    .row.clickable-future:hover { border-color: rgba(25,195,125,0.28); }
+    .row.clickable-future:hover .hint.future { opacity: 1; transform: translateY(0); color: #93ffcf; }
+    .row.clickable-done:hover { border-color: rgba(239,95,103,0.28); }
+    .row.clickable-done:hover .hint.done { opacity: 1; transform: translateY(0); color: #ffb8bd; }
+
+    .row.completed {
+      background: rgba(25,195,125,0.07);
+      border-color: rgba(25,195,125,0.14);
+    }
+
+    .row.late {
+      background: rgba(239,95,103,0.09);
+      border-color: rgba(239,95,103,0.18);
+    }
+
+    .empty {
+      border: 1px dashed rgba(255,255,255,0.12);
+      border-radius: 14px;
+      padding: 20px;
+      color: var(--muted);
+      background: rgba(255,255,255,0.02);
+      line-height: 1.6;
+    }
+
+    form {
+      display: grid;
+      gap: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .field label {
+      color: #c9d6f1;
+      font-size: 0.92rem;
+      font-weight: 600;
+    }
+
+    .field input {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.045);
+      color: var(--text);
+      padding: 12px 14px;
+      outline: none;
+    }
+
+    .field input:focus { border-color: rgba(110,168,254,0.45); box-shadow: 0 0 0 3px rgba(110,168,254,0.14); }
+
+    .apps-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .app-card {
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      border-radius: 14px;
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .app-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .app-title {
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin: 0 0 4px;
+    }
+
+    .app-meta {
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .app-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    details > summary {
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    details > summary::-webkit-details-marker { display: none; }
+
+    .calendar-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .calendar-label {
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .dow {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--muted);
+      padding-bottom: 4px;
+    }
+
+    .day {
+      min-height: 78px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.03);
+      padding: 8px;
+      text-align: left;
+      display: grid;
+      align-content: space-between;
+      gap: 8px;
+      color: var(--text);
+      position: relative;
+    }
+
+    .day.muted { opacity: 0.35; }
+    .day.today { outline: 2px solid rgba(110,168,254,0.55); }
+    .day.workable { cursor: pointer; }
+    .day.workable:hover { background: rgba(255,255,255,0.06); }
+    .day.ooo { background: rgba(239,95,103,0.12); border-color: rgba(239,95,103,0.28); }
+    .day.booked { box-shadow: inset 0 0 0 1px rgba(25,195,125,0.23); }
+    .day-number { font-size: 0.88rem; font-weight: 700; }
+    .day-flags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .dot {
+      border-radius: 999px;
+      padding: 4px 7px;
+      font-size: 0.72rem;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.05);
+      color: #d7e3fb;
+    }
+
+    .dot.booked { background: rgba(25,195,125,0.18); color: #d8fff0; border-color: rgba(25,195,125,0.3); }
+    .dot.ooo { background: rgba(239,95,103,0.18); color: #ffd8da; border-color: rgba(239,95,103,0.3); }
+
+    .footer-note {
+      margin-top: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 0.92rem;
+    }
+
+    .stats {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .stat {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      min-width: 130px;
+    }
+
+    .stat-label { color: var(--muted); font-size: 0.8rem; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .stat-value { font-weight: 800; letter-spacing: -0.02em; }
+
+    .mono { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+    @media (max-width: 1060px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { order: -1; }
+    }
+
+    @media (max-width: 720px) {
+      .app-shell { padding: 18px; }
+      .row { grid-template-columns: 1fr; }
+      .row-right { justify-items: start; text-align: left; }
+      .progress { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .calendar-grid { gap: 6px; }
+      .day { min-height: 72px; }
+    }
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="hdr">
-    <div>
-      <div class="mono muted" style="font-size:10px;letter-spacing:3px;text-transform:uppercase;margin-bottom:4px">Patent Practice</div>
-      <div style="font-size:19px;font-weight:500;">Application Scheduler</div>
-    </div>
-    <div style="text-align:right">
-      <div class="mono muted" style="font-size:11px">Today</div>
-      <div id="hdr-date" class="mono" style="font-weight:500;font-size:13px;margin-top:2px"></div>
+  <div class="app-shell">
+    <header class="hero">
+      <div>
+        <h1>Patent Workflow Scheduler</h1>
+        <p>Single-file browser scheduler for patent drafting work. It plans one session per Monday–Thursday workday, skips out-of-office dates, rebuilds the forward schedule from scratch after every change, and flags any matter that slips past deadline.</p>
+      </div>
+      <div class="hero-actions">
+        <button class="btn small" id="exportBtn">Export backup</button>
+        <button class="btn small secondary" id="importBtn">Import backup</button>
+        <button class="btn small danger" id="resetBtn">Reset all data</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <main class="main-col">
+        <section id="todayCard"></section>
+        <section id="warningPanel"></section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Schedule</h2>
+              <p>Recent completed sessions plus the forward-looking plan generated by earliest-deadline-first scheduling.</p>
+            </div>
+            <div class="chip blue" id="scheduleSummary">0 sessions planned</div>
+          </div>
+          <div id="scheduleList" class="timeline"></div>
+        </section>
+      </main>
+
+      <aside class="sidebar">
+        <section class="panel">
+          <h2>Add application</h2>
+          <form id="addForm">
+            <div class="field">
+              <label for="matterInput">Matter number</label>
+              <input id="matterInput" name="matter" placeholder="1234-123" autocomplete="off" required />
+            </div>
+            <div class="field">
+              <label for="callInput">Call day</label>
+              <input id="callInput" name="callDay" type="date" required />
+            </div>
+            <div class="field">
+              <label for="deadlineInput">Deadline</label>
+              <input id="deadlineInput" name="deadline" type="date" required />
+            </div>
+            <button class="btn primary" type="submit">Add application</button>
+          </form>
+          <div class="footer-note">Each matter always moves through the same six stages in order: Claims, Drawings, Write, First Edit, Second Edit, and Proof.</div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Applications</h2>
+              <p>Sorted by deadline. Progress is derived from the completion log.</p>
+            </div>
+            <div class="chip" id="appCountBadge">0 active</div>
+          </div>
+          <div id="appsList" class="apps-list"></div>
+        </section>
+
+        <section class="panel">
+          <details open>
+            <summary>
+              <span>OOO calendar</span>
+              <span class="muted">Click Mon–Thu to toggle</span>
+            </summary>
+            <div class="calendar-nav">
+              <button class="btn small ghost" id="prevMonthBtn">←</button>
+              <div class="calendar-label" id="calendarLabel"></div>
+              <button class="btn small ghost" id="nextMonthBtn">→</button>
+            </div>
+            <div id="calendarGrid"></div>
+            <div class="footer-note">Booked dates show how many sessions are currently assigned there. Friday–Sunday are non-working days and cannot be marked OOO.</div>
+          </details>
+        </section>
+      </aside>
     </div>
   </div>
 
-  <div id="stats" class="stats"></div>
+  <input type="file" id="importInput" accept="application/json" hidden />
 
-  <div class="layout">
-    <div class="main">
-      <div class="card" style="overflow:hidden">
-        <div class="panel-hdr">
-          <span class="panel-ttl">Application Queue</span>
-          <div style="display:flex;gap:8px;align-items:center">
-            <span id="ord-lbl" class="ord-lbl mono"></span>
-            <button id="rst-btn" class="rst-btn" onclick="resetOrd()" style="display:none">Reset to EDF ↺</button>
-          </div>
-        </div>
-        <div id="q-list"></div>
-      </div>
+  <script>
+    const STAGES = ['Claims', 'Drawings', 'Write', 'First Edit', 'Second Edit', 'Proof'];
+    const STAGE_ABBR = ['CL', 'DR', 'WR', 'E1', 'E2', 'PF'];
+    const STORAGE_KEYS = {
+      apps: 'pws_apps',
+      clog: 'pws_clog',
+      ooo: 'pws_ooo',
+      actions: 'pws_actions',
+      calendarMonth: 'pws_calendar_month'
+    };
 
-      <div class="card" style="overflow:hidden">
-        <button class="sim-tog-btn" onclick="togSim()">
-          <span>⊕ Can I take on another application?</span>
-          <span id="sim-tog" class="mono muted" style="font-size:10px">▼ SIMULATE</span>
-        </button>
-        <div id="sim-body" class="sim-body">
-          <div style="display:flex;gap:8px;margin-bottom:10px">
-            <input id="sim-nm" placeholder="Application name (optional)" oninput="renderAll()">
-            <div style="flex-shrink:0">
-              <div class="mono muted" style="font-size:10px;letter-spacing:2px;margin-bottom:2px">DEADLINE</div>
-              <input type="date" id="sim-dl" style="width:155px" oninput="renderAll()">
+    const state = loadState();
+    const els = {
+      todayCard: document.getElementById('todayCard'),
+      warningPanel: document.getElementById('warningPanel'),
+      scheduleList: document.getElementById('scheduleList'),
+      scheduleSummary: document.getElementById('scheduleSummary'),
+      addForm: document.getElementById('addForm'),
+      matterInput: document.getElementById('matterInput'),
+      callInput: document.getElementById('callInput'),
+      deadlineInput: document.getElementById('deadlineInput'),
+      appsList: document.getElementById('appsList'),
+      appCountBadge: document.getElementById('appCountBadge'),
+      calendarGrid: document.getElementById('calendarGrid'),
+      calendarLabel: document.getElementById('calendarLabel'),
+      prevMonthBtn: document.getElementById('prevMonthBtn'),
+      nextMonthBtn: document.getElementById('nextMonthBtn'),
+      exportBtn: document.getElementById('exportBtn'),
+      importBtn: document.getElementById('importBtn'),
+      importInput: document.getElementById('importInput'),
+      resetBtn: document.getElementById('resetBtn')
+    };
+
+    init();
+
+    function init() {
+      bindEvents();
+      renderAll();
+    }
+
+    function bindEvents() {
+      els.addForm.addEventListener('submit', onAddApp);
+      els.prevMonthBtn.addEventListener('click', () => shiftMonth(-1));
+      els.nextMonthBtn.addEventListener('click', () => shiftMonth(1));
+      els.exportBtn.addEventListener('click', exportData);
+      els.importBtn.addEventListener('click', () => els.importInput.click());
+      els.importInput.addEventListener('change', importData);
+      els.resetBtn.addEventListener('click', resetAll);
+
+      els.todayCard.addEventListener('click', (event) => {
+        const action = event.target.closest('[data-action]');
+        if (!action) return;
+        const type = action.dataset.action;
+        if (type === 'complete') completeStage(action.dataset.appId);
+        if (type === 'complete-next') completeNextDueToday();
+        if (type === 'undo-last-today') undoLastTodayCompletion();
+      });
+
+      els.scheduleList.addEventListener('click', (event) => {
+        const row = event.target.closest('[data-row-action]');
+        if (!row) return;
+        const type = row.dataset.rowAction;
+        if (type === 'complete') completeStage(row.dataset.appId);
+        if (type === 'reopen') reopenFromStage(row.dataset.appId, Number(row.dataset.stageIndex));
+      });
+
+      els.appsList.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-remove-app]');
+        if (!button) return;
+        removeApp(button.dataset.removeApp);
+      });
+
+      els.calendarGrid.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-toggle-ooo]');
+        if (!button) return;
+        toggleOoo(button.dataset.toggleOoo);
+      });
+    }
+
+    function loadState() {
+      const apps = safeParse(localStorage.getItem(STORAGE_KEYS.apps), []);
+      const clog = safeParse(localStorage.getItem(STORAGE_KEYS.clog), {});
+      const ooo = safeParse(localStorage.getItem(STORAGE_KEYS.ooo), []);
+      const actions = safeParse(localStorage.getItem(STORAGE_KEYS.actions), []);
+      const calendarMonth = localStorage.getItem(STORAGE_KEYS.calendarMonth) || startOfMonthIso(today());
+
+      const normalized = {
+        apps: Array.isArray(apps) ? apps.filter(Boolean) : [],
+        clog: clog && typeof clog === 'object' ? clog : {},
+        ooo: Array.isArray(ooo) ? [...new Set(ooo)].sort() : [],
+        actions: Array.isArray(actions) ? actions.filter(Boolean) : [],
+        calendarMonth
+      };
+
+      normalized.apps = normalized.apps
+        .map((app) => ({
+          id: app.id || uid(),
+          matter: String(app.matter || '').trim(),
+          callDay: String(app.callDay || ''),
+          deadline: String(app.deadline || '')
+        }))
+        .filter((app) => app.matter && isIsoDate(app.callDay) && isIsoDate(app.deadline));
+
+      reconcileActions(normalized);
+      return normalized;
+    }
+
+    function reconcileActions(targetState) {
+      const actionMap = new Map();
+      (targetState.actions || []).forEach((action) => {
+        if (!action || !action.appId || !isIsoDate(action.date)) return;
+        if (!actionMap.has(action.appId)) actionMap.set(action.appId, []);
+        actionMap.get(action.appId).push({
+          id: action.id || uid(),
+          appId: action.appId,
+          stageIndex: Number.isFinite(action.stageIndex) ? Number(action.stageIndex) : null,
+          date: action.date,
+          ts: Number.isFinite(action.ts) ? Number(action.ts) : Date.parse(action.date + 'T00:00:00')
+        });
+      });
+
+      const rebuilt = [];
+      targetState.apps.forEach((app) => {
+        const dates = Array.isArray(targetState.clog[app.id]) ? targetState.clog[app.id].filter(isIsoDate).slice(0, STAGES.length) : [];
+        targetState.clog[app.id] = dates;
+        const existing = (actionMap.get(app.id) || []).sort((a, b) => a.ts - b.ts);
+        dates.forEach((date, idx) => {
+          const prior = existing[idx];
+          rebuilt.push({
+            id: prior?.id || uid(),
+            appId: app.id,
+            stageIndex: idx,
+            date,
+            ts: prior?.ts || Date.parse(date + 'T00:00:00') + idx
+          });
+        });
+      });
+      targetState.actions = rebuilt.sort((a, b) => a.ts - b.ts);
+    }
+
+    function safeParse(value, fallback) {
+      try { return value ? JSON.parse(value) : fallback; }
+      catch { return fallback; }
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEYS.apps, JSON.stringify(state.apps));
+      localStorage.setItem(STORAGE_KEYS.clog, JSON.stringify(state.clog));
+      localStorage.setItem(STORAGE_KEYS.ooo, JSON.stringify(state.ooo));
+      localStorage.setItem(STORAGE_KEYS.actions, JSON.stringify(state.actions));
+      localStorage.setItem(STORAGE_KEYS.calendarMonth, state.calendarMonth);
+    }
+
+    function onAddApp(event) {
+      event.preventDefault();
+      const matter = els.matterInput.value.trim();
+      const callDay = els.callInput.value;
+      const deadline = els.deadlineInput.value;
+
+      if (!matter || !isIsoDate(callDay) || !isIsoDate(deadline)) {
+        alert('Please provide a matter number, call day, and deadline.');
+        return;
+      }
+      if (deadline < callDay) {
+        alert('Deadline must be on or after the call day.');
+        return;
+      }
+      if (state.apps.some((app) => app.matter.toLowerCase() === matter.toLowerCase())) {
+        const proceed = confirm('A matter with this number already exists. Add another entry anyway?');
+        if (!proceed) return;
+      }
+
+      const app = { id: uid(), matter, callDay, deadline };
+      state.apps.push(app);
+      state.clog[app.id] = [];
+      saveState();
+      els.addForm.reset();
+      renderAll();
+    }
+
+    function removeApp(appId) {
+      const app = getApp(appId);
+      if (!app) return;
+      const ok = confirm('Remove ' + app.matter + '? This deletes its completion history too.');
+      if (!ok) return;
+      state.apps = state.apps.filter((item) => item.id !== appId);
+      delete state.clog[appId];
+      state.actions = state.actions.filter((action) => action.appId !== appId);
+      saveState();
+      renderAll();
+    }
+
+    function completeStage(appId) {
+      const app = getApp(appId);
+      if (!app) return;
+      const todayIso = iso(today());
+      if (!isSchedulableToday(todayIso)) {
+        alert('Today is not an available working day. Only Monday through Thursday days that are not marked OOO can be completed.');
+        return;
+      }
+      if (app.callDay > todayIso) {
+        alert('This matter cannot begin before its call day.');
+        return;
+      }
+
+      const currentCount = completionCount(appId);
+      if (currentCount >= STAGES.length) return;
+
+      state.clog[appId] = [...(state.clog[appId] || []), todayIso];
+      state.actions.push({
+        id: uid(),
+        appId,
+        stageIndex: currentCount,
+        date: todayIso,
+        ts: Date.now()
+      });
+      saveState();
+      renderAll();
+    }
+
+    function completeNextDueToday() {
+      const schedule = buildSchedule();
+      const next = schedule.future[0];
+      if (!next) return;
+      completeStage(next.appId);
+    }
+
+    function undoLastTodayCompletion() {
+      const todayIso = iso(today());
+      const todays = state.actions.filter((action) => action.date === todayIso).sort((a, b) => a.ts - b.ts);
+      const last = todays[todays.length - 1];
+      if (!last) return;
+      const entries = state.clog[last.appId] || [];
+      if (!entries.length) return;
+      state.clog[last.appId] = entries.slice(0, -1);
+      state.actions = state.actions.filter((action) => action.id !== last.id);
+      reconcileActions(state);
+      saveState();
+      renderAll();
+    }
+
+    function reopenFromStage(appId, stageIndex) {
+      const app = getApp(appId);
+      if (!app) return;
+      const stageName = STAGES[stageIndex] || 'that stage';
+      const ok = confirm('Reopen ' + app.matter + ' from ' + stageName + '? This removes that completion and any later completions for the same matter.');
+      if (!ok) return;
+      state.clog[appId] = (state.clog[appId] || []).slice(0, stageIndex);
+      state.actions = state.actions.filter((action) => !(action.appId === appId && action.stageIndex >= stageIndex));
+      reconcileActions(state);
+      saveState();
+      renderAll();
+    }
+
+    function toggleOoo(dateIso) {
+      if (!isIsoDate(dateIso)) return;
+      const date = fromIso(dateIso);
+      const day = date.getDay();
+      if (day < 1 || day > 4) return;
+      const set = new Set(state.ooo);
+      if (set.has(dateIso)) set.delete(dateIso);
+      else set.add(dateIso);
+      state.ooo = [...set].sort();
+      saveState();
+      renderAll();
+    }
+
+    function exportData() {
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        apps: state.apps,
+        clog: state.clog,
+        ooo: state.ooo,
+        actions: state.actions,
+        calendarMonth: state.calendarMonth
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'patent-workflow-scheduler-backup.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importData(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(String(reader.result || '{}'));
+          const incoming = {
+            apps: Array.isArray(parsed.apps) ? parsed.apps : [],
+            clog: parsed.clog && typeof parsed.clog === 'object' ? parsed.clog : {},
+            ooo: Array.isArray(parsed.ooo) ? parsed.ooo : [],
+            actions: Array.isArray(parsed.actions) ? parsed.actions : [],
+            calendarMonth: isIsoDate(parsed.calendarMonth) ? parsed.calendarMonth : startOfMonthIso(today())
+          };
+          state.apps = incoming.apps;
+          state.clog = incoming.clog;
+          state.ooo = [...new Set(incoming.ooo)].sort();
+          state.actions = incoming.actions;
+          state.calendarMonth = incoming.calendarMonth;
+          reconcileActions(state);
+          saveState();
+          renderAll();
+        } catch (error) {
+          alert('Could not import that file. Please choose a valid scheduler backup JSON file.');
+        } finally {
+          event.target.value = '';
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function resetAll() {
+      const ok = confirm('Reset all applications, completions, and OOO dates?');
+      if (!ok) return;
+      state.apps = [];
+      state.clog = {};
+      state.ooo = [];
+      state.actions = [];
+      state.calendarMonth = startOfMonthIso(today());
+      saveState();
+      renderAll();
+    }
+
+    function shiftMonth(delta) {
+      const current = fromIso(state.calendarMonth);
+      current.setMonth(current.getMonth() + delta, 1);
+      state.calendarMonth = startOfMonthIso(current);
+      saveState();
+      renderAll();
+    }
+
+    function renderAll() {
+      reconcileActions(state);
+      saveState();
+      const schedule = buildSchedule();
+      renderTodayCard(schedule);
+      renderWarnings(schedule);
+      renderSchedule(schedule);
+      renderApps(schedule);
+      renderCalendar(schedule);
+    }
+
+    function buildSchedule() {
+      const todayDate = today();
+      const todayIso = iso(todayDate);
+      const hasTodayCompletion = state.actions.some((action) => action.date === todayIso);
+      const startDate = hasTodayCompletion ? addDays(todayDate, 1) : todayDate;
+      const startIso = iso(startDate);
+      const byId = new Map(state.apps.map((app) => [app.id, app]));
+      const remaining = new Map(state.apps.map((app) => [app.id, completionCount(app.id)]));
+      const future = [];
+      const bookedByDate = {};
+      const appsSorted = [...state.apps].sort(compareApps);
+      const maxSteps = Math.max(3650, state.apps.length * 20);
+      let cursor = new Date(startDate);
+      let steps = 0;
+
+      while ([...remaining.values()].some((count) => count < STAGES.length) && steps < maxSteps) {
+        steps += 1;
+        const cursorIso = iso(cursor);
+        if (!isWorkday(cursorIso)) {
+          cursor = addDays(cursor, 1);
+          continue;
+        }
+
+        const eligible = appsSorted.filter((app) => {
+          const count = remaining.get(app.id) || 0;
+          return count < STAGES.length && app.callDay <= cursorIso;
+        });
+
+        if (!eligible.length) {
+          cursor = addDays(cursor, 1);
+          continue;
+        }
+
+        eligible.sort(compareApps);
+        const app = eligible[0];
+        const stageIndex = remaining.get(app.id) || 0;
+        const row = {
+          type: 'future',
+          date: cursorIso,
+          appId: app.id,
+          matter: app.matter,
+          stageIndex,
+          stage: STAGES[stageIndex],
+          deadline: app.deadline,
+          callDay: app.callDay,
+          late: cursorIso > app.deadline,
+          daysUntilDeadline: diffCalendarDays(todayIso, app.deadline)
+        };
+
+        future.push(row);
+        bookedByDate[cursorIso] = (bookedByDate[cursorIso] || 0) + 1;
+        remaining.set(app.id, stageIndex + 1);
+        cursor = addDays(cursor, 1);
+      }
+
+      const nextByApp = {};
+      future.forEach((row) => {
+        if (!nextByApp[row.appId]) nextByApp[row.appId] = row;
+      });
+
+      const cutoff = addDays(todayDate, -21);
+      const recentCompleted = state.actions
+        .filter((action) => fromIso(action.date) >= cutoff)
+        .sort((a, b) => a.ts - b.ts)
+        .map((action) => {
+          const app = byId.get(action.appId);
+          if (!app) return null;
+          return {
+            type: 'done',
+            date: action.date,
+            appId: action.appId,
+            matter: app.matter,
+            stageIndex: action.stageIndex,
+            stage: STAGES[action.stageIndex],
+            deadline: app.deadline,
+            callDay: app.callDay,
+            ts: action.ts
+          };
+        })
+        .filter(Boolean);
+
+      const lateByApp = new Map();
+      future.filter((row) => row.late).forEach((row) => {
+        if (!lateByApp.has(row.appId)) lateByApp.set(row.appId, []);
+        lateByApp.get(row.appId).push(row);
+      });
+
+      return {
+        todayIso,
+        startIso,
+        hasTodayCompletion,
+        future,
+        nextByApp,
+        recentCompleted,
+        bookedByDate,
+        lateByApp,
+        stats: {
+          activeApps: state.apps.length,
+          remainingSessions: future.length,
+          lateApps: lateByApp.size
+        }
+      };
+    }
+
+    function renderTodayCard(schedule) {
+      const todayIso = schedule.todayIso;
+      const todaysActions = state.actions.filter((action) => action.date === todayIso).sort((a, b) => a.ts - b.ts);
+      const workday = isWorkday(todayIso);
+      const firstFuture = schedule.future[0] || null;
+      const currentTask = firstFuture && firstFuture.date === todayIso ? firstFuture : null;
+
+      if (!state.apps.length) {
+        els.todayCard.innerHTML = `
+          <div class="today-card">
+            <div class="eyebrow">Today</div>
+            <h2 class="today-title">No applications yet</h2>
+            <p class="today-copy">Add a matter in the sidebar to start building a forward schedule. Everything is stored in your browser, so the page can be hosted as a single static file.</p>
+            <div class="stats">
+              <div class="stat"><div class="stat-label">Working days</div><div class="stat-value">Mon–Thu</div></div>
+              <div class="stat"><div class="stat-label">Stages</div><div class="stat-value">6 per matter</div></div>
+              <div class="stat"><div class="stat-label">Storage</div><div class="stat-value">localStorage</div></div>
             </div>
           </div>
-          <div id="sim-out"></div>
-        </div>
-      </div>
-    </div>
+        `;
+        return;
+      }
 
-    <div class="side">
-      <div class="card cal-card">
-        <div class="cal-nav-row">
-          <button class="cal-nav" onclick="prevMo()">‹</button>
-          <span id="cal-lbl" class="cal-lbl"></span>
-          <button class="cal-nav" onclick="nextMo()">›</button>
-        </div>
-        <div class="cal-hint mono">Click Mon–Thu to mark as OOO</div>
-        <div class="cal-dow">
-          <span>M</span><span>T</span><span>W</span><span>T</span>
-          <span class="wknd">F</span><span class="wknd">S</span><span class="wknd">S</span>
-        </div>
-        <div id="cal-grid" class="cal-grid"></div>
-        <div class="cal-legend">
-          <span><span class="leg-dot" style="background:#e6f1fb"></span>Scheduled</span>
-          <span><span class="leg-dot" style="background:#fcebeb"></span>OOO</span>
-        </div>
-        <div class="cal-footer">
-          <span id="ooo-ct" class="mono muted" style="font-size:11px"></span>
-          <button id="clr-ooo" class="clr-btn mono" onclick="clrOoo()" style="display:none">Clear all</button>
-        </div>
-      </div>
+      if (todaysActions.length) {
+        const latest = todaysActions[todaysActions.length - 1];
+        const app = getApp(latest.appId);
+        const next = schedule.future[0] || null;
+        const completedCount = completionCount(latest.appId);
+        const nextCopy = next
+          ? `Next scheduled item is <strong>${escapeHtml(next.stage)}</strong> for <strong>${escapeHtml(next.matter)}</strong> on <strong>${formatDateLong(next.date)}</strong>.`
+          : 'All remaining work is complete.';
 
-      <div class="card add-card">
-        <div style="font-size:14px;font-weight:500;margin-bottom:9px">Add Application</div>
-        <div style="display:flex;flex-direction:column;gap:7px">
-          <input id="app-nm" placeholder="Client / matter name" oninput="renderAll()" onkeydown="if(event.key==='Enter')addApp()">
-          <div>
-            <div class="mono muted lbl">HARD DEADLINE</div>
-            <input type="date" id="app-dl" oninput="renderAll()" onkeydown="if(event.key==='Enter')addApp()">
+        els.todayCard.innerHTML = `
+          <div class="today-card">
+            <div class="today-top">
+              <div>
+                <div class="eyebrow">Today</div>
+                <h2 class="today-title">Completed ${escapeHtml(STAGES[latest.stageIndex])} for ${escapeHtml(app?.matter || 'matter')}</h2>
+              </div>
+              <div class="chip green">${todaysActions.length} logged today</div>
+            </div>
+            <div class="today-meta">
+              <div class="chip blue">Deadline ${formatDateShort(app?.deadline || todayIso)}</div>
+              ${deadlineChip(app?.deadline || todayIso)}
+              <div class="chip amber">Last completed stage: ${escapeHtml(STAGES[latest.stageIndex])}</div>
+            </div>
+            <p class="today-copy">You have already recorded work today. ${nextCopy}</p>
+            ${progressHtml(completedCount, completedCount, completedCount >= STAGES.length)}
+            <div class="today-actions">
+              <button class="btn danger" data-action="undo-last-today">Undo last completion</button>
+              ${workday && next && getApp(next.appId)?.callDay <= todayIso ? `<button class="btn secondary" data-action="complete-next">Mark next due task today</button>` : ''}
+            </div>
           </div>
-          <button id="add-btn" class="add-btn" onclick="addApp()" disabled>Add to Queue</button>
+        `;
+        return;
+      }
+
+      if (!workday) {
+        els.todayCard.innerHTML = `
+          <div class="today-card">
+            <div class="today-top">
+              <div>
+                <div class="eyebrow">Today</div>
+                <h2 class="today-title">No work scheduled today</h2>
+              </div>
+              <div class="chip ${state.ooo.includes(todayIso) ? 'red' : 'blue'}">${state.ooo.includes(todayIso) ? 'Marked OOO' : 'Non-working day'}</div>
+            </div>
+            <p class="today-copy">The scheduler only assigns one session per Monday–Thursday workday. ${firstFuture ? `The next scheduled session is <strong>${escapeHtml(firstFuture.stage)}</strong> for <strong>${escapeHtml(firstFuture.matter)}</strong> on <strong>${formatDateLong(firstFuture.date)}</strong>.` : 'There are no future sessions pending.'}</p>
+            ${firstFuture ? progressHtml(completionCount(firstFuture.appId), firstFuture.stageIndex) : ''}
+          </div>
+        `;
+        return;
+      }
+
+      if (!currentTask) {
+        els.todayCard.innerHTML = `
+          <div class="today-card">
+            <div class="today-top">
+              <div>
+                <div class="eyebrow">Today</div>
+                <h2 class="today-title">Nothing to do today</h2>
+              </div>
+              <div class="chip blue">Schedule is caught up</div>
+            </div>
+            <p class="today-copy">No matter is eligible for today. That usually means every remaining application has a future call day or the active queue is already fully completed.</p>
+          </div>
+        `;
+        return;
+      }
+
+      const app = getApp(currentTask.appId);
+      const completedCount = completionCount(currentTask.appId);
+      els.todayCard.innerHTML = `
+        <div class="today-card">
+          <div class="today-top">
+            <div>
+              <div class="eyebrow">Today</div>
+              <h2 class="today-title">${escapeHtml(currentTask.stage)} — ${escapeHtml(currentTask.matter)}</h2>
+            </div>
+            <div class="chip ${currentTask.late ? 'red' : 'green'}">${currentTask.late ? 'Planned late' : 'On track'}</div>
+          </div>
+          <div class="today-meta">
+            <div class="chip blue">Call day ${formatDateShort(app.callDay)}</div>
+            <div class="chip blue">Deadline ${formatDateShort(app.deadline)}</div>
+            ${deadlineChip(app.deadline)}
+          </div>
+          <p class="today-copy">This is the next highest-priority eligible session under earliest-deadline-first scheduling. Recording completion will rebuild the rest of the queue instantly.</p>
+          ${progressHtml(completedCount, currentTask.stageIndex)}
+          <div class="today-actions">
+            <button class="btn primary" data-action="complete" data-app-id="${escapeAttr(currentTask.appId)}">Mark complete</button>
+          </div>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="conf-panel"></div>
-</div>
-
-<script>
-const pad=n=>String(n).padStart(2,'0');
-const toStr=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-const fromStr=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
-const TODAY=toStr(new Date());
-const isWT=s=>{const dw=fromStr(s).getDay();return dw>=1&&dw<=4;};
-const nxtD=(s,n=1)=>{const d=fromStr(s);d.setDate(d.getDate()+n);return toStr(d);};
-const dif=(a,b)=>Math.round((fromStr(b)-fromStr(a))/86400000);
-const fmtL=s=>!s?'':fromStr(s).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-const fmtS=s=>!s?'':fromStr(s).toLocaleDateString('en-US',{month:'short',day:'numeric'});
-const getWD=(st,n,ooo)=>{const d=[];let c=st,g=0;while(d.length<n&&g++<600){if(isWT(c)&&!ooo.has(c))d.push(c);c=nxtD(c);}return d;};
-
-let apps=[],ooo=new Set(),custOrd=null,calMo={y:new Date().getFullYear(),m:new Date().getMonth()},simOpen=false,_i=0;
-const uid=()=>`a${_i++}`;
-
-const bldSched=(al,os)=>{let cur=TODAY;return al.map(a=>{const wds=getWD(cur,7,os);const dn=wds[6]||'';const lt=dn&&dn>a.deadline;if(dn)cur=nxtD(dn);return{...a,wds,dn,ok:!lt,lt:lt?dif(a.deadline,dn):0};});};
-const edf=()=>[...apps].sort((a,b)=>a.deadline.localeCompare(b.deadline));
-const ord=()=>{if(!custOrd)return edf();const m=Object.fromEntries(apps.map(a=>[a.id,a]));return custOrd.map(id=>m[id]).filter(Boolean);};
-const getSched=()=>bldSched(ord(),ooo);
-
-function addApp(){
-  const n=document.getElementById('app-nm').value.trim(),d=document.getElementById('app-dl').value;
-  if(!n||!d)return;
-  apps.push({id:uid(),name:n,deadline:d});
-  document.getElementById('app-nm').value='';
-  document.getElementById('app-dl').value='';
-  custOrd=null;renderAll();
-}
-function rmApp(id){apps=apps.filter(a=>a.id!==id);if(custOrd)custOrd=custOrd.filter(x=>x!==id);renderAll();}
-function mvApp(i,dir){const c=custOrd||ord().map(a=>a.id),t=i+dir;if(t<0||t>=c.length)return;const n=[...c];[n[i],n[t]]=[n[t],n[i]];custOrd=n;renderAll();}
-function resetOrd(){custOrd=null;renderAll();}
-function togOoo(ds){if(!isWT(ds))return;ooo.has(ds)?ooo.delete(ds):ooo.add(ds);renderAll();}
-function clrOoo(){ooo=new Set();renderAll();}
-function prevMo(){const d=new Date(calMo.y,calMo.m-1);calMo={y:d.getFullYear(),m:d.getMonth()};renderAll();}
-function nextMo(){const d=new Date(calMo.y,calMo.m+1);calMo={y:d.getFullYear(),m:d.getMonth()};renderAll();}
-function togSim(){simOpen=!simOpen;document.getElementById('sim-body').style.display=simOpen?'block':'none';document.getElementById('sim-tog').textContent=simOpen?'▲ HIDE':'▼ SIMULATE';renderAll();}
-function prio(id){const r=ord().filter(a=>a.id!==id).map(a=>a.id);custOrd=[id,...r];renderAll();}
-
-function renderAll(){
-  const sc=getSched(),or=ord(),cf=sc.filter(s=>!s.ok),bk=new Set(sc.flatMap(s=>s.wds||[]));
-  document.getElementById('hdr-date').textContent=fmtL(TODAY);
-  const SA=[{l:'Queued',v:apps.length},{l:'Days / App',v:'7'},{l:'Work Days',v:'Mon–Thu'},{l:'OOO Blocked',v:ooo.size},{l:'Conflicts',v:cf.length,al:cf.length>0}];
-  document.getElementById('stats').innerHTML=SA.map(s=>`<div class="stat${s.al?' alarm':''}">`+
-    `<div class="stat-l mono">${s.l}</div>`+
-    `<div class="stat-v">${s.v}</div></div>`).join('');
-  document.getElementById('ord-lbl').textContent=custOrd?'Custom Order':'Earliest Deadline First';
-  document.getElementById('rst-btn').style.display=custOrd?'':'none';
-  const badge=s=>s.ok?(dif(TODAY,s.deadline)<=14?'badge-warn':'badge-ok'):'badge-bad';
-  const ql=document.getElementById('q-list');
-  if(!sc.length){ql.innerHTML='<div class="q-empty">No applications queued — add one to get started.</div>';}
-  else{ql.innerHTML=sc.map((s,i)=>`<div class="q-row">`+
-    `<div class="arr">`+
-    `<button onclick="mvApp(${i},-1)" ${i===0?'disabled':''}>▲</button>`+
-    `<button onclick="mvApp(${i},1)" ${i===sc.length-1?'disabled':''}>▼</button></div>`+
-    `<div class="q-num mono">${i+1}</div>`+
-    `<div style="flex:1;min-width:0"><div class="q-name">${s.name}</div>`+
-    `<div class="q-sub mono">Deadline: ${fmtL(s.deadline)}${!s.ok?` · <span class="lt">${s.lt}d late</span>`:''}</div></div>`+
-    `<div style="text-align:right;flex-shrink:0"><div class="mono muted" style="font-size:10px;letter-spacing:2px;margin-bottom:3px">Completes</div>`+
-    `<span class="${badge(s)}">${fmtS(s.dn)}</span></div>`+
-    `<button class="q-rm" onclick="rmApp('${s.id}')" title="Remove">×</button></div>`).join('');}
-  const nm=document.getElementById('app-nm').value.trim(),adl=document.getElementById('app-dl').value,btn=document.getElementById('add-btn');
-  if(nm&&adl){btn.classList.add('ready');btn.disabled=false;}
-  else{btn.classList.remove('ready');btn.disabled=true;}
-  if(simOpen){
-    const sNm=document.getElementById('sim-nm').value||'New Application',sDl=document.getElementById('sim-dl').value,so=document.getElementById('sim-out');
-    if(!sDl){so.innerHTML='<div class="muted" style="font-size:13px;text-align:center;padding:6px 0">Enter a deadline above to simulate.</div>';}
-    else{
-      const sA={id:'__sim__',name:sNm,deadline:sDl},ins=or.findIndex(a=>a.deadline>sDl),comb=ins===-1?[...or,sA]:[...or.slice(0,ins),sA,...or.slice(ins)];
-      const ss=bldSched(comb,ooo),se=ss.find(s=>s.id==='__sim__'),nl=ss.filter(s=>!s.ok&&s.id!=='__sim__'&&sc.find(x=>x.id===s.id)?.ok);
-      const verdict=se?(se.ok&&!nl.length?['ok','✓ Safe to accept — no existing deadlines affected.']:!se.ok?['bad','✗ Cannot be completed by its deadline with current workload.']:['warn',`⚠ Completes on time, but ${nl.length} existing application${nl.length!==1?'s':''} will miss their deadline${nl.length!==1?'s':''}.`]):['',''];
-      so.innerHTML=`<div class="sim-inner">`+
-        `<div class="mono muted" style="font-size:10px;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px">Simulation — Full Queue</div>`+
-        ss.map(s=>{const ex=sc.find(x=>x.id===s.id);const rg=ex?.ok&&!s.ok;const iN=s.id==='__sim__';return`<div class="sim-row">`+
-          `<div style="font-size:13px;color:${iN?'#185fa5':rg?'#854f0b':'#1a1a18'}">${iN?'★ ':rg?'⚠ ':''}${s.name}</div>`+
-          `<div class="mono" style="font-size:12px;color:${s.ok?'#3b6d11':'#a32d2d'}">${fmtS(s.dn)}${!s.ok?` +${s.lt}d`:''}</div></div>`;}).join('')+
-        (verdict[0]?`<div class="sim-vd ${verdict[0]}">${verdict[1]}</div>`:'')+
-        '</div>';
+      `;
     }
-  }
-  const cd=new Date(calMo.y,calMo.m,1);
-  document.getElementById('cal-lbl').textContent=cd.toLocaleDateString('en-US',{month:'long',year:'numeric'});
-  const fw=cd.getDay(),off=fw===0?6:fw-1,dim=new Date(calMo.y,calMo.m+1,0).getDate();
-  const cells=[...Array(off).fill(null),...Array.from({length:dim},(_,k)=>k+1)];
-  document.getElementById('cal-grid').innerHTML=cells.map((day,i)=>{
-    if(!day)return'<div></div>';
-    const pw=i%7,clk=pw<4,ds=toStr(new Date(calMo.y,calMo.m,day));
-    const iO=ooo.has(ds),iT=ds===TODAY,iB=bk.has(ds);
-    const cls=['cal-cell'];
-    if(pw>=4)cls.push('wknd');else if(iO)cls.push('ooo');else if(iB)cls.push('booked');
-    if(iT)cls.push('today');
-    return`<button class="${cls.join(' ')}" ${clk?`onclick="togOoo('${ds}')"`:''}>${day}</button>`;
-  }).join('');
-  document.getElementById('ooo-ct').textContent=ooo.size?`${ooo.size} day${ooo.size!==1?'s':''} blocked`:'No OOO days blocked';
-  document.getElementById('clr-ooo').style.display=ooo.size?'':'none';
-  const cp=document.getElementById('conf-panel');
-  if(!cf.length){cp.innerHTML='';return;}
-  const fd=getWD(TODAY,7,ooo)[6];
-  const sugs=cf.map(c=>{const ac=fd&&fd<=c.deadline;if(!ac)return{app:c,ac:false};const no=[c,...or.filter(a=>a.id!==c.id)];const ns=bldSched(no,ooo);const nb=ns.filter(s=>!s.ok&&s.id!==c.id&&sc.find(x=>x.id===s.id)?.ok);return{app:c,ac:true,nb};});
-  cp.innerHTML=`<div class="conf-wrap">`+
-    `<div class="conf-ttl">⚠ ${cf.length} Scheduling Conflict${cf.length!==1?'s':''}</div>`+
-    `<div class="conf-sub">The following applications cannot be completed by their deadlines in the current queue order.</div>`+
-    sugs.map(sg=>`<div class="conf-item">`+
-      `<div class="conf-nm">${sg.app.name}</div>`+
-      (!sg.ac
-        ?`<div class="conf-txt">Cannot meet deadline of <strong>${fmtL(sg.app.deadline)}</strong> even if started today. Consider negotiating an extension.</div>`
-        :`<div class="conf-txt">`+
-          `<span>If moved to position 1, completes <strong>${fmtS(fd)}</strong> — on time.`+
-          (sg.nb.length?` However, <strong style="color:#854f0b">${sg.nb.map(a=>a.name).join(', ')}</strong> would miss their deadline.`:` <span style="color:#3b6d11">No other deadlines affected.</span>`)+'</span>'+
-          `<button class="prio-btn" onclick="prio('${sg.app.id}')">Prioritize ↑</button></div>`)
-      +'</div>').join('')+'</div>';
-}
-renderAll();
-</script>
+
+    function renderWarnings(schedule) {
+      if (!schedule.lateByApp.size) {
+        els.warningPanel.innerHTML = '';
+        return;
+      }
+
+      const lines = [...schedule.lateByApp.entries()].map(([appId, rows]) => {
+        const app = getApp(appId);
+        const details = rows.map((row) => `${row.stage} on ${formatDateShort(row.date)}`).join(', ');
+        return `<li><strong>${escapeHtml(app?.matter || appId)}</strong> misses its ${formatDateShort(app?.deadline || rows[0].deadline)} deadline. Late sessions: ${escapeHtml(details)}.</li>`;
+      }).join('');
+
+      els.warningPanel.innerHTML = `
+        <section class="panel warning">
+          <h3>Overbooking detected</h3>
+          <p class="muted">At least one session is landing after deadline under the current queue, call days, OOO dates, and existing completions.</p>
+          <ul>${lines}</ul>
+        </section>
+      `;
+    }
+
+    function renderSchedule(schedule) {
+      const combined = [...schedule.recentCompleted, ...schedule.future].sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        if (a.type !== b.type) return a.type === 'done' ? -1 : 1;
+        if (a.type === 'done' && b.type === 'done') return (a.ts || 0) - (b.ts || 0);
+        return compareApps(getApp(a.appId), getApp(b.appId));
+      });
+
+      els.scheduleSummary.textContent = schedule.future.length + ' sessions planned';
+
+      if (!combined.length) {
+        els.scheduleList.innerHTML = '<div class="empty">No completed or future sessions to show yet.</div>';
+        return;
+      }
+
+      const chunks = [];
+      let activeDate = '';
+      combined.forEach((row) => {
+        if (row.date !== activeDate) {
+          activeDate = row.date;
+          chunks.push(`<div class="date-group"><div class="date-label">${escapeHtml(formatDateLong(row.date))}</div></div>`);
+        }
+        chunks.push(renderScheduleRow(row, schedule));
+      });
+      els.scheduleList.innerHTML = chunks.join('');
+    }
+
+    function renderScheduleRow(row, schedule) {
+      const app = getApp(row.appId);
+      const nextForApp = schedule.nextByApp[row.appId];
+      const clickableFuture = row.type === 'future' && nextForApp && nextForApp.stageIndex === row.stageIndex && nextForApp.date === row.date && app && app.callDay <= schedule.todayIso && isSchedulableToday(schedule.todayIso);
+      const classes = ['row'];
+      if (row.type === 'done') classes.push('completed', 'clickable-done');
+      if (clickableFuture) classes.push('clickable-future');
+      if (row.late) classes.push('late');
+
+      const rightChips = row.type === 'done'
+        ? `<div class="hint done">↺ reopen</div>`
+        : `${deadlineChip(row.deadline)}<div class="hint future">✓ mark done</div>`;
+
+      const status = row.type === 'done'
+        ? `<span class="chip green">Completed</span>`
+        : `<span class="chip ${row.late ? 'red' : 'blue'}">Scheduled</span>`;
+
+      const sub = row.type === 'done'
+        ? `Completed on ${formatDateShort(row.date)} • Deadline ${formatDateShort(row.deadline)}`
+        : `Call ${formatDateShort(row.callDay)} • Deadline ${formatDateShort(row.deadline)}`;
+
+      return `
+        <div
+          class="${classes.join(' ')}"
+          ${row.type === 'done' ? `data-row-action="reopen" data-app-id="${escapeAttr(row.appId)}" data-stage-index="${row.stageIndex}"` : ''}
+          ${clickableFuture ? `data-row-action="complete" data-app-id="${escapeAttr(row.appId)}"` : ''}
+        >
+          <div class="row-left">
+            <div class="row-title">
+              <span class="matter">${escapeHtml(row.matter)}</span>
+              <span class="stage-name">${escapeHtml(row.stage)}</span>
+              ${status}
+            </div>
+            <div class="row-sub">${escapeHtml(sub)}</div>
+          </div>
+          <div class="row-right">
+            ${rightChips}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderApps(schedule) {
+      const apps = [...state.apps].sort(compareApps);
+      els.appCountBadge.textContent = apps.length + ' active';
+
+      if (!apps.length) {
+        els.appsList.innerHTML = '<div class="empty">No applications yet.</div>';
+        return;
+      }
+
+      els.appsList.innerHTML = apps.map((app) => {
+        const count = completionCount(app.id);
+        const next = schedule.nextByApp[app.id];
+        const overdue = next?.late;
+        return `
+          <div class="app-card">
+            <div class="app-head">
+              <div>
+                <div class="app-title mono">${escapeHtml(app.matter)}</div>
+                <div class="app-meta">Call ${formatDateShort(app.callDay)} • Deadline ${formatDateShort(app.deadline)} • ${count}/${STAGES.length} complete</div>
+              </div>
+              <div class="app-actions">
+                ${overdue ? '<span class="chip red">Late</span>' : count >= STAGES.length ? '<span class="chip green">Done</span>' : '<span class="chip amber">Active</span>'}
+                <button class="btn small danger" data-remove-app="${escapeAttr(app.id)}">Remove</button>
+              </div>
+            </div>
+            ${progressHtml(count, next?.stageIndex ?? count, count >= STAGES.length)}
+            <div class="app-meta">${next ? `Next up: ${escapeHtml(next.stage)} on ${formatDateShort(next.date)}` : 'No remaining sessions.'}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderCalendar(schedule) {
+      const monthDate = fromIso(state.calendarMonth);
+      monthDate.setDate(1);
+      els.calendarLabel.textContent = monthDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+      const start = new Date(monthDate);
+      start.setDate(1 - start.getDay());
+      const cells = [];
+      const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      cells.push('<div class="calendar-grid">');
+      dow.forEach((label) => cells.push(`<div class="dow">${label}</div>`));
+
+      const todayIso = iso(today());
+      for (let i = 0; i < 42; i += 1) {
+        const date = addDays(start, i);
+        const dateIso = iso(date);
+        const inMonth = date.getMonth() === monthDate.getMonth();
+        const workable = date.getDay() >= 1 && date.getDay() <= 4;
+        const isOoo = state.ooo.includes(dateIso);
+        const booked = schedule.bookedByDate[dateIso] || 0;
+        const classes = ['day'];
+        if (!inMonth) classes.push('muted');
+        if (dateIso === todayIso) classes.push('today');
+        if (workable) classes.push('workable');
+        if (isOoo) classes.push('ooo');
+        if (booked) classes.push('booked');
+
+        cells.push(`
+          <button
+            type="button"
+            class="${classes.join(' ')}"
+            ${workable ? `data-toggle-ooo="${dateIso}"` : 'disabled'}
+            title="${workable ? 'Toggle OOO' : 'Non-working day'}"
+          >
+            <div class="day-number">${date.getDate()}</div>
+            <div class="day-flags">
+              ${booked ? `<span class="dot booked">${booked} booked</span>` : ''}
+              ${isOoo ? '<span class="dot ooo">OOO</span>' : ''}
+            </div>
+          </button>
+        `);
+      }
+      cells.push('</div>');
+      els.calendarGrid.innerHTML = cells.join('');
+    }
+
+    function progressHtml(completedCount, currentStageIndex, treatAllDone = false) {
+      return `
+        <div class="progress">
+          ${STAGE_ABBR.map((abbr, idx) => {
+            const cls = idx < completedCount
+              ? 'done'
+              : (treatAllDone ? 'done' : idx === currentStageIndex && completedCount < STAGES.length ? 'current' : 'pending');
+            const label = STAGES[idx];
+            return `<div class="stage-pill ${cls}" title="${escapeAttr(label)}">${abbr}</div>`;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function deadlineChip(deadlineIso) {
+      const delta = diffCalendarDays(iso(today()), deadlineIso);
+      if (delta < 0) return `<div class="chip red">${Math.abs(delta)} day${Math.abs(delta) === 1 ? '' : 's'} overdue</div>`;
+      if (delta === 0) return '<div class="chip red">Due today</div>';
+      if (delta === 1) return '<div class="chip amber">1 day left</div>';
+      return `<div class="chip ${delta <= 7 ? 'amber' : 'blue'}">${delta} days left</div>`;
+    }
+
+    function getApp(appId) {
+      return state.apps.find((app) => app.id === appId) || null;
+    }
+
+    function completionCount(appId) {
+      return Math.min((state.clog[appId] || []).length, STAGES.length);
+    }
+
+    function compareApps(a, b) {
+      if (!a && !b) return 0;
+      if (!a) return 1;
+      if (!b) return -1;
+      return (a.deadline || '').localeCompare(b.deadline || '') || (a.callDay || '').localeCompare(b.callDay || '') || (a.matter || '').localeCompare(b.matter || '');
+    }
+
+    function isWorkday(dateIso) {
+      const date = typeof dateIso === 'string' ? fromIso(dateIso) : dateIso;
+      const day = date.getDay();
+      if (day < 1 || day > 4) return false;
+      return !state.ooo.includes(iso(date));
+    }
+
+    function isSchedulableToday(dateIso) {
+      return isWorkday(dateIso);
+    }
+
+    function today() {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+
+    function addDays(dateOrIso, days) {
+      const d = typeof dateOrIso === 'string' ? fromIso(dateOrIso) : new Date(dateOrIso);
+      d.setDate(d.getDate() + days);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+
+    function iso(date) {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function fromIso(value) {
+      return new Date(value + 'T00:00:00');
+    }
+
+    function startOfMonthIso(date) {
+      const d = new Date(date);
+      d.setDate(1);
+      d.setHours(0, 0, 0, 0);
+      return iso(d);
+    }
+
+    function diffCalendarDays(fromIsoDate, toIsoDate) {
+      const from = fromIso(fromIsoDate);
+      const to = fromIso(toIsoDate);
+      const ms = to.getTime() - from.getTime();
+      return Math.round(ms / 86400000);
+    }
+
+    function formatDateShort(dateIso) {
+      return fromIso(dateIso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function formatDateLong(dateIso) {
+      return fromIso(dateIso).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    }
+
+    function isIsoDate(value) {
+      return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+    }
+
+    function uid() {
+      return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value);
+    }
+  </script>
 </body>
 </html>
