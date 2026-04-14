@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Patent Application Scheduler</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f4f0;color:#1a1a18;min-height:100vh;padding:1.5rem;}
+.card{background:#fff;border:0.5px solid rgba(0,0,0,0.12);border-radius:12px;}
+input,button{font-family:inherit;}
+input{background:#f5f4f0;border:0.5px solid rgba(0,0,0,0.22);color:#1a1a18;padding:7px 10px;border-radius:8px;font-size:13px;outline:none;width:100%;}
+input:focus{border-color:rgba(0,0,0,0.4);}
+input[type=date]{font-family:'Courier New',monospace;}
+input::placeholder{color:#888780;}
+button{cursor:pointer;transition:opacity .12s;}
+button:hover:not(:disabled){opacity:.7;}
+button:disabled{opacity:.35;cursor:default;}
+.mono{font-family:'Courier New',monospace;}
+.muted{color:#5f5e5a;}
+.wrap{max-width:960px;margin:0 auto;}
+.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:.75rem;}
+.stat{background:#f5f4f0;border-radius:8px;padding:10px 12px;}
+.stat-l{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#5f5e5a;margin-bottom:4px;}
+.stat-v{font-size:20px;font-weight:500;}
+.stat.alarm .stat-l{color:#a32d2d;}
+.stat.alarm .stat-v{color:#a32d2d;}
+.layout{display:flex;gap:14px;align-items:flex-start;}
+.main{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:10px;}
+.side{width:268px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;}
+.hdr{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:.75rem;border-bottom:.5px solid rgba(0,0,0,0.1);margin-bottom:.75rem;}
+.badge-ok{background:#eaf3de;color:#3b6d11;padding:3px 9px;border-radius:8px;font-size:12px;font-weight:500;}
+.badge-warn{background:#faeeda;color:#854f0b;padding:3px 9px;border-radius:8px;font-size:12px;font-weight:500;}
+.badge-bad{background:#fcebeb;color:#a32d2d;padding:3px 9px;border-radius:8px;font-size:12px;font-weight:500;}
+.q-row{padding:11px 14px;border-bottom:.5px solid rgba(0,0,0,0.08);display:flex;align-items:center;gap:8px;}
+.q-num{width:22px;height:22px;border-radius:50%;background:#f5f4f0;border:.5px solid rgba(0,0,0,0.15);display:flex;align-items:center;justify-content:center;font-size:11px;color:#5f5e5a;flex-shrink:0;}
+.q-name{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.q-sub{font-size:11px;color:#5f5e5a;margin-top:1px;}
+.q-sub .lt{color:#a32d2d;}
+.q-rm{background:none;border:none;color:#b4b2a9;font-size:17px;padding:2px 4px;}
+.arr{display:flex;flex-direction:column;gap:1px;flex-shrink:0;}
+.arr button{background:none;border:none;color:#b4b2a9;font-size:11px;padding:1px 3px;line-height:1;}
+.q-empty{padding:28px 14px;text-align:center;color:#5f5e5a;font-size:13px;}
+.panel-hdr{padding:10px 14px;border-bottom:.5px solid rgba(0,0,0,0.08);display:flex;justify-content:space-between;align-items:center;}
+.panel-ttl{font-weight:500;font-size:14px;}
+.add-card{padding:12px;}
+.add-card .lbl{font-size:10px;color:#5f5e5a;letter-spacing:2px;margin-bottom:2px;}
+.add-btn{background:#f5f4f0;border:.5px solid rgba(0,0,0,0.18);color:#5f5e5a;padding:8px;border-radius:8px;font-size:13px;font-weight:500;width:100%;margin-top:4px;}
+.add-btn.ready{background:#1a1a18;color:#fff;border-color:transparent;}
+.cal-card{padding:12px;}
+.cal-lbl{font-size:13px;font-weight:500;text-align:center;}
+.cal-nav{background:none;border:none;color:#5f5e5a;font-size:16px;padding:0 5px;line-height:1;}
+.cal-nav-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;}
+.cal-hint{font-size:10px;color:#5f5e5a;text-align:center;margin-bottom:6px;}
+.cal-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px;}
+.cal-dow span{text-align:center;font-size:10px;color:#5f5e5a;padding:1px 0;}
+.cal-dow span.wknd{color:#b4b2a9;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+.cal-cell{background:transparent;border:.5px solid transparent;border-radius:4px;color:#1a1a18;padding:4px 2px;font-size:11px;cursor:pointer;text-align:center;line-height:1.3;}
+.cal-cell.wknd{color:#b4b2a9;cursor:default;}
+.cal-cell.ooo{background:#fcebeb;color:#a32d2d;}
+.cal-cell.booked{background:#e6f1fb;color:#185fa5;}
+.cal-cell.today{border:.5px solid #ba7517 !important;font-weight:500;}
+.cal-legend{display:flex;gap:12px;font-size:10px;color:#5f5e5a;margin-top:8px;}
+.leg-dot{display:inline-block;width:9px;height:9px;border-radius:2px;vertical-align:middle;margin-right:3px;}
+.cal-footer{margin-top:7px;display:flex;justify-content:space-between;align-items:center;}
+.clr-btn{background:none;border:none;color:#5f5e5a;font-size:11px;}
+.sim-tog-btn{width:100%;padding:10px 14px;background:none;border:none;color:#1a1a18;display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:500;text-align:left;}
+.sim-body{display:none;border-top:.5px solid rgba(0,0,0,0.08);padding:12px 14px;}
+.sim-inner{background:#f5f4f0;border:.5px solid rgba(0,0,0,0.1);border-radius:12px;padding:12px;}
+.sim-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:.5px solid rgba(0,0,0,0.08);}
+.sim-vd{font-size:12px;border-radius:8px;padding:7px 10px;margin-top:8px;}
+.sim-vd.ok{background:#eaf3de;color:#3b6d11;}
+.sim-vd.bad{background:#fcebeb;color:#a32d2d;}
+.sim-vd.warn{background:#faeeda;color:#854f0b;}
+.conf-wrap{background:#fcebeb;border:.5px solid rgba(163,45,45,0.35);border-radius:12px;padding:14px 16px;margin-top:10px;}
+.conf-ttl{font-size:15px;font-weight:500;color:#a32d2d;margin-bottom:6px;}
+.conf-sub{font-size:12px;color:#a32d2d;opacity:.85;margin-bottom:10px;}
+.conf-item{background:#fff;border:.5px solid rgba(163,45,45,0.3);border-radius:8px;padding:10px 12px;margin-bottom:7px;}
+.conf-nm{font-weight:500;font-size:14px;margin-bottom:5px;}
+.conf-txt{font-size:12px;color:#5f5e5a;display:flex;flex-wrap:wrap;gap:7px;align-items:center;}
+.prio-btn{background:#1a1a18;color:#fff;border:none;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:500;flex-shrink:0;}
+.ord-lbl{color:#5f5e5a;font-size:10px;letter-spacing:2px;}
+.rst-btn{background:none;border:.5px solid rgba(0,0,0,0.18);color:#5f5e5a;padding:2px 8px;border-radius:8px;font-size:11px;}
+@media(max-width:680px){
+  .stats{grid-template-columns:repeat(2,1fr);}
+  .stats .stat:last-child{grid-column:span 2;}
+  .layout{flex-direction:column;}
+  .side{width:100%;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <div>
+      <div class="mono muted" style="font-size:10px;letter-spacing:3px;text-transform:uppercase;margin-bottom:4px">Patent Practice</div>
+      <div style="font-size:19px;font-weight:500;">Application Scheduler</div>
+    </div>
+    <div style="text-align:right">
+      <div class="mono muted" style="font-size:11px">Today</div>
+      <div id="hdr-date" class="mono" style="font-weight:500;font-size:13px;margin-top:2px"></div>
+    </div>
+  </div>
+
+  <div id="stats" class="stats"></div>
+
+  <div class="layout">
+    <div class="main">
+      <div class="card" style="overflow:hidden">
+        <div class="panel-hdr">
+          <span class="panel-ttl">Application Queue</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span id="ord-lbl" class="ord-lbl mono"></span>
+            <button id="rst-btn" class="rst-btn" onclick="resetOrd()" style="display:none">Reset to EDF ↺</button>
+          </div>
+        </div>
+        <div id="q-list"></div>
+      </div>
+
+      <div class="card" style="overflow:hidden">
+        <button class="sim-tog-btn" onclick="togSim()">
+          <span>⊕ Can I take on another application?</span>
+          <span id="sim-tog" class="mono muted" style="font-size:10px">▼ SIMULATE</span>
+        </button>
+        <div id="sim-body" class="sim-body">
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <input id="sim-nm" placeholder="Application name (optional)" oninput="renderAll()">
+            <div style="flex-shrink:0">
+              <div class="mono muted" style="font-size:10px;letter-spacing:2px;margin-bottom:2px">DEADLINE</div>
+              <input type="date" id="sim-dl" style="width:155px" oninput="renderAll()">
+            </div>
+          </div>
+          <div id="sim-out"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="card cal-card">
+        <div class="cal-nav-row">
+          <button class="cal-nav" onclick="prevMo()">‹</button>
+          <span id="cal-lbl" class="cal-lbl"></span>
+          <button class="cal-nav" onclick="nextMo()">›</button>
+        </div>
+        <div class="cal-hint mono">Click Mon–Thu to mark as OOO</div>
+        <div class="cal-dow">
+          <span>M</span><span>T</span><span>W</span><span>T</span>
+          <span class="wknd">F</span><span class="wknd">S</span><span class="wknd">S</span>
+        </div>
+        <div id="cal-grid" class="cal-grid"></div>
+        <div class="cal-legend">
+          <span><span class="leg-dot" style="background:#e6f1fb"></span>Scheduled</span>
+          <span><span class="leg-dot" style="background:#fcebeb"></span>OOO</span>
+        </div>
+        <div class="cal-footer">
+          <span id="ooo-ct" class="mono muted" style="font-size:11px"></span>
+          <button id="clr-ooo" class="clr-btn mono" onclick="clrOoo()" style="display:none">Clear all</button>
+        </div>
+      </div>
+
+      <div class="card add-card">
+        <div style="font-size:14px;font-weight:500;margin-bottom:9px">Add Application</div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <input id="app-nm" placeholder="Client / matter name" oninput="renderAll()" onkeydown="if(event.key==='Enter')addApp()">
+          <div>
+            <div class="mono muted lbl">HARD DEADLINE</div>
+            <input type="date" id="app-dl" oninput="renderAll()" onkeydown="if(event.key==='Enter')addApp()">
+          </div>
+          <button id="add-btn" class="add-btn" onclick="addApp()" disabled>Add to Queue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="conf-panel"></div>
+</div>
+
+<script>
+const pad=n=>String(n).padStart(2,'0');
+const toStr=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const fromStr=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
+const TODAY=toStr(new Date());
+const isWT=s=>{const dw=fromStr(s).getDay();return dw>=1&&dw<=4;};
+const nxtD=(s,n=1)=>{const d=fromStr(s);d.setDate(d.getDate()+n);return toStr(d);};
+const dif=(a,b)=>Math.round((fromStr(b)-fromStr(a))/86400000);
+const fmtL=s=>!s?'':fromStr(s).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+const fmtS=s=>!s?'':fromStr(s).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+const getWD=(st,n,ooo)=>{const d=[];let c=st,g=0;while(d.length<n&&g++<600){if(isWT(c)&&!ooo.has(c))d.push(c);c=nxtD(c);}return d;};
+
+let apps=[],ooo=new Set(),custOrd=null,calMo={y:new Date().getFullYear(),m:new Date().getMonth()},simOpen=false,_i=0;
+const uid=()=>`a${_i++}`;
+
+const bldSched=(al,os)=>{let cur=TODAY;return al.map(a=>{const wds=getWD(cur,7,os);const dn=wds[6]||'';const lt=dn&&dn>a.deadline;if(dn)cur=nxtD(dn);return{...a,wds,dn,ok:!lt,lt:lt?dif(a.deadline,dn):0};});};
+const edf=()=>[...apps].sort((a,b)=>a.deadline.localeCompare(b.deadline));
+const ord=()=>{if(!custOrd)return edf();const m=Object.fromEntries(apps.map(a=>[a.id,a]));return custOrd.map(id=>m[id]).filter(Boolean);};
+const getSched=()=>bldSched(ord(),ooo);
+
+function addApp(){
+  const n=document.getElementById('app-nm').value.trim(),d=document.getElementById('app-dl').value;
+  if(!n||!d)return;
+  apps.push({id:uid(),name:n,deadline:d});
+  document.getElementById('app-nm').value='';
+  document.getElementById('app-dl').value='';
+  custOrd=null;renderAll();
+}
+function rmApp(id){apps=apps.filter(a=>a.id!==id);if(custOrd)custOrd=custOrd.filter(x=>x!==id);renderAll();}
+function mvApp(i,dir){const c=custOrd||ord().map(a=>a.id),t=i+dir;if(t<0||t>=c.length)return;const n=[...c];[n[i],n[t]]=[n[t],n[i]];custOrd=n;renderAll();}
+function resetOrd(){custOrd=null;renderAll();}
+function togOoo(ds){if(!isWT(ds))return;ooo.has(ds)?ooo.delete(ds):ooo.add(ds);renderAll();}
+function clrOoo(){ooo=new Set();renderAll();}
+function prevMo(){const d=new Date(calMo.y,calMo.m-1);calMo={y:d.getFullYear(),m:d.getMonth()};renderAll();}
+function nextMo(){const d=new Date(calMo.y,calMo.m+1);calMo={y:d.getFullYear(),m:d.getMonth()};renderAll();}
+function togSim(){simOpen=!simOpen;document.getElementById('sim-body').style.display=simOpen?'block':'none';document.getElementById('sim-tog').textContent=simOpen?'▲ HIDE':'▼ SIMULATE';renderAll();}
+function prio(id){const r=ord().filter(a=>a.id!==id).map(a=>a.id);custOrd=[id,...r];renderAll();}
+
+function renderAll(){
+  const sc=getSched(),or=ord(),cf=sc.filter(s=>!s.ok),bk=new Set(sc.flatMap(s=>s.wds||[]));
+  document.getElementById('hdr-date').textContent=fmtL(TODAY);
+  const SA=[{l:'Queued',v:apps.length},{l:'Days / App',v:'7'},{l:'Work Days',v:'Mon–Thu'},{l:'OOO Blocked',v:ooo.size},{l:'Conflicts',v:cf.length,al:cf.length>0}];
+  document.getElementById('stats').innerHTML=SA.map(s=>`<div class="stat${s.al?' alarm':''}">`+
+    `<div class="stat-l mono">${s.l}</div>`+
+    `<div class="stat-v">${s.v}</div></div>`).join('');
+  document.getElementById('ord-lbl').textContent=custOrd?'Custom Order':'Earliest Deadline First';
+  document.getElementById('rst-btn').style.display=custOrd?'':'none';
+  const badge=s=>s.ok?(dif(TODAY,s.deadline)<=14?'badge-warn':'badge-ok'):'badge-bad';
+  const ql=document.getElementById('q-list');
+  if(!sc.length){ql.innerHTML='<div class="q-empty">No applications queued — add one to get started.</div>';}
+  else{ql.innerHTML=sc.map((s,i)=>`<div class="q-row">`+
+    `<div class="arr">`+
+    `<button onclick="mvApp(${i},-1)" ${i===0?'disabled':''}>▲</button>`+
+    `<button onclick="mvApp(${i},1)" ${i===sc.length-1?'disabled':''}>▼</button></div>`+
+    `<div class="q-num mono">${i+1}</div>`+
+    `<div style="flex:1;min-width:0"><div class="q-name">${s.name}</div>`+
+    `<div class="q-sub mono">Deadline: ${fmtL(s.deadline)}${!s.ok?` · <span class="lt">${s.lt}d late</span>`:''}</div></div>`+
+    `<div style="text-align:right;flex-shrink:0"><div class="mono muted" style="font-size:10px;letter-spacing:2px;margin-bottom:3px">Completes</div>`+
+    `<span class="${badge(s)}">${fmtS(s.dn)}</span></div>`+
+    `<button class="q-rm" onclick="rmApp('${s.id}')" title="Remove">×</button></div>`).join('');}
+  const nm=document.getElementById('app-nm').value.trim(),adl=document.getElementById('app-dl').value,btn=document.getElementById('add-btn');
+  if(nm&&adl){btn.classList.add('ready');btn.disabled=false;}
+  else{btn.classList.remove('ready');btn.disabled=true;}
+  if(simOpen){
+    const sNm=document.getElementById('sim-nm').value||'New Application',sDl=document.getElementById('sim-dl').value,so=document.getElementById('sim-out');
+    if(!sDl){so.innerHTML='<div class="muted" style="font-size:13px;text-align:center;padding:6px 0">Enter a deadline above to simulate.</div>';}
+    else{
+      const sA={id:'__sim__',name:sNm,deadline:sDl},ins=or.findIndex(a=>a.deadline>sDl),comb=ins===-1?[...or,sA]:[...or.slice(0,ins),sA,...or.slice(ins)];
+      const ss=bldSched(comb,ooo),se=ss.find(s=>s.id==='__sim__'),nl=ss.filter(s=>!s.ok&&s.id!=='__sim__'&&sc.find(x=>x.id===s.id)?.ok);
+      const verdict=se?(se.ok&&!nl.length?['ok','✓ Safe to accept — no existing deadlines affected.']:!se.ok?['bad','✗ Cannot be completed by its deadline with current workload.']:['warn',`⚠ Completes on time, but ${nl.length} existing application${nl.length!==1?'s':''} will miss their deadline${nl.length!==1?'s':''}.`]):['',''];
+      so.innerHTML=`<div class="sim-inner">`+
+        `<div class="mono muted" style="font-size:10px;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px">Simulation — Full Queue</div>`+
+        ss.map(s=>{const ex=sc.find(x=>x.id===s.id);const rg=ex?.ok&&!s.ok;const iN=s.id==='__sim__';return`<div class="sim-row">`+
+          `<div style="font-size:13px;color:${iN?'#185fa5':rg?'#854f0b':'#1a1a18'}">${iN?'★ ':rg?'⚠ ':''}${s.name}</div>`+
+          `<div class="mono" style="font-size:12px;color:${s.ok?'#3b6d11':'#a32d2d'}">${fmtS(s.dn)}${!s.ok?` +${s.lt}d`:''}</div></div>`;}).join('')+
+        (verdict[0]?`<div class="sim-vd ${verdict[0]}">${verdict[1]}</div>`:'')+
+        '</div>';
+    }
+  }
+  const cd=new Date(calMo.y,calMo.m,1);
+  document.getElementById('cal-lbl').textContent=cd.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const fw=cd.getDay(),off=fw===0?6:fw-1,dim=new Date(calMo.y,calMo.m+1,0).getDate();
+  const cells=[...Array(off).fill(null),...Array.from({length:dim},(_,k)=>k+1)];
+  document.getElementById('cal-grid').innerHTML=cells.map((day,i)=>{
+    if(!day)return'<div></div>';
+    const pw=i%7,clk=pw<4,ds=toStr(new Date(calMo.y,calMo.m,day));
+    const iO=ooo.has(ds),iT=ds===TODAY,iB=bk.has(ds);
+    const cls=['cal-cell'];
+    if(pw>=4)cls.push('wknd');else if(iO)cls.push('ooo');else if(iB)cls.push('booked');
+    if(iT)cls.push('today');
+    return`<button class="${cls.join(' ')}" ${clk?`onclick="togOoo('${ds}')"`:''}>${day}</button>`;
+  }).join('');
+  document.getElementById('ooo-ct').textContent=ooo.size?`${ooo.size} day${ooo.size!==1?'s':''} blocked`:'No OOO days blocked';
+  document.getElementById('clr-ooo').style.display=ooo.size?'':'none';
+  const cp=document.getElementById('conf-panel');
+  if(!cf.length){cp.innerHTML='';return;}
+  const fd=getWD(TODAY,7,ooo)[6];
+  const sugs=cf.map(c=>{const ac=fd&&fd<=c.deadline;if(!ac)return{app:c,ac:false};const no=[c,...or.filter(a=>a.id!==c.id)];const ns=bldSched(no,ooo);const nb=ns.filter(s=>!s.ok&&s.id!==c.id&&sc.find(x=>x.id===s.id)?.ok);return{app:c,ac:true,nb};});
+  cp.innerHTML=`<div class="conf-wrap">`+
+    `<div class="conf-ttl">⚠ ${cf.length} Scheduling Conflict${cf.length!==1?'s':''}</div>`+
+    `<div class="conf-sub">The following applications cannot be completed by their deadlines in the current queue order.</div>`+
+    sugs.map(sg=>`<div class="conf-item">`+
+      `<div class="conf-nm">${sg.app.name}</div>`+
+      (!sg.ac
+        ?`<div class="conf-txt">Cannot meet deadline of <strong>${fmtL(sg.app.deadline)}</strong> even if started today. Consider negotiating an extension.</div>`
+        :`<div class="conf-txt">`+
+          `<span>If moved to position 1, completes <strong>${fmtS(fd)}</strong> — on time.`+
+          (sg.nb.length?` However, <strong style="color:#854f0b">${sg.nb.map(a=>a.name).join(', ')}</strong> would miss their deadline.`:` <span style="color:#3b6d11">No other deadlines affected.</span>`)+'</span>'+
+          `<button class="prio-btn" onclick="prio('${sg.app.id}')">Prioritize ↑</button></div>`)
+      +'</div>').join('')+'</div>';
+}
+renderAll();
+</script>
+</body>
+</html>
