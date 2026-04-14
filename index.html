@@ -1065,7 +1065,10 @@
       const todayDate = today();
       const todayIso = iso(todayDate);
       const hasTodayCompletion = state.actions.some((action) => action.date === todayIso);
-      const startDate = hasTodayCompletion ? addDays(todayDate, 1) : todayDate;
+      // Always start from today so the user can complete more than one session on a single day.
+      // The remaining-count map already accounts for all prior completions, so the scheduler
+      // naturally picks up where the user left off rather than pushing everything to tomorrow.
+      const startDate = todayDate;
       const startIso = iso(startDate);
       const byId = new Map(state.apps.map((app) => [app.id, app]));
       const remaining = new Map(state.apps.map((app) => [app.id, completionCount(app.id)]));
@@ -1146,6 +1149,30 @@
         lateByApp.get(row.appId).push(row);
       });
 
+      // Count workdays that have elapsed since the last logged completion where there was eligible
+      // work to do.  These are days the user may have skipped without recording a session.
+      let missedWorkdays = 0;
+      if (state.actions.length > 0) {
+        const lastActionDate = state.actions.reduce((max, a) => (a.date > max ? a.date : max), '');
+        if (lastActionDate && lastActionDate < todayIso) {
+          let mc = addDays(fromIso(lastActionDate), 1);
+          while (iso(mc) < todayIso) {
+            const mcIso = iso(mc);
+            if (isWorkday(mcIso)) {
+              // Only flag the day if at least one app was both callable and incomplete at
+              // that point.  We use the current completion count as the best approximation
+              // of the historical count (it can only be equal-or-higher, so this is
+              // conservative: an app that is now fully done is NOT counted as missed).
+              const hadEligible = state.apps.some(
+                (app) => app.callDay <= mcIso && completionCount(app.id) < STAGES.length
+              );
+              if (hadEligible) missedWorkdays += 1;
+            }
+            mc = addDays(mc, 1);
+          }
+        }
+      }
+
       return {
         todayIso,
         startIso,
@@ -1155,6 +1182,7 @@
         recentCompleted,
         bookedByDate,
         lateByApp,
+        missedWorkdays,
         stats: {
           activeApps: state.apps.length,
           remainingSessions: future.length,
@@ -1186,40 +1214,6 @@
         return;
       }
 
-      if (todaysActions.length) {
-        const latest = todaysActions[todaysActions.length - 1];
-        const app = getApp(latest.appId);
-        const next = schedule.future[0] || null;
-        const completedCount = completionCount(latest.appId);
-        const nextCopy = next
-          ? `Next scheduled item is <strong>${escapeHtml(next.stage)}</strong> for <strong>${escapeHtml(next.matter)}</strong> on <strong>${formatDateLong(next.date)}</strong>.`
-          : 'All remaining work is complete.';
-
-        els.todayCard.innerHTML = `
-          <div class="today-card">
-            <div class="today-top">
-              <div>
-                <div class="eyebrow">Today</div>
-                <h2 class="today-title">Completed ${escapeHtml(STAGES[latest.stageIndex])} for ${escapeHtml(app?.matter || 'matter')}</h2>
-              </div>
-              <div class="chip green">${todaysActions.length} logged today</div>
-            </div>
-            <div class="today-meta">
-              <div class="chip blue">Deadline ${formatDateShort(app?.deadline || todayIso)}</div>
-              ${deadlineChip(app?.deadline || todayIso)}
-              <div class="chip amber">Last completed stage: ${escapeHtml(STAGES[latest.stageIndex])}</div>
-            </div>
-            <p class="today-copy">You have already recorded work today. ${nextCopy}</p>
-            ${progressHtml(completedCount, completedCount, completedCount >= STAGES.length)}
-            <div class="today-actions">
-              <button class="btn danger" data-action="undo-last-today">Undo last completion</button>
-              ${workday && next && getApp(next.appId)?.callDay <= todayIso ? `<button class="btn secondary" data-action="complete-next">Mark next due task today</button>` : ''}
-            </div>
-          </div>
-        `;
-        return;
-      }
-
       if (!workday) {
         els.todayCard.innerHTML = `
           <div class="today-card">
@@ -1230,73 +1224,129 @@
               </div>
               <div class="chip ${state.ooo.includes(todayIso) ? 'red' : 'blue'}">${state.ooo.includes(todayIso) ? 'Marked OOO' : 'Non-working day'}</div>
             </div>
-            <p class="today-copy">The scheduler only assigns one session per Monday–Thursday workday. ${firstFuture ? `The next scheduled session is <strong>${escapeHtml(firstFuture.stage)}</strong> for <strong>${escapeHtml(firstFuture.matter)}</strong> on <strong>${formatDateLong(firstFuture.date)}</strong>.` : 'There are no future sessions pending.'}</p>
+            <p class="today-copy">The scheduler assigns sessions on Monday–Thursday workdays only. ${firstFuture ? `The next scheduled session is <strong>${escapeHtml(firstFuture.stage)}</strong> for <strong>${escapeHtml(firstFuture.matter)}</strong> on <strong>${formatDateLong(firstFuture.date)}</strong>.` : 'There are no future sessions pending.'}</p>
             ${firstFuture ? progressHtml(completionCount(firstFuture.appId), firstFuture.stageIndex) : ''}
           </div>
         `;
         return;
       }
 
-      if (!currentTask) {
+      // A task is available for today — show it whether this is the first session of the day
+      // or the user is doing additional sessions after already logging one or more.
+      if (currentTask) {
+        const app = getApp(currentTask.appId);
+        const completedCount = completionCount(currentTask.appId);
+        const loggedChip = todaysActions.length
+          ? `<div class="chip green">${todaysActions.length} logged today</div>`
+          : '';
+        const statusChip = `<div class="chip ${currentTask.late ? 'red' : 'green'}">${currentTask.late ? 'Planned late' : 'On track'}</div>`;
+        const copySessions = todaysActions.length
+          ? `${todaysActions.length} session${todaysActions.length > 1 ? 's' : ''} already logged today. `
+          : '';
         els.todayCard.innerHTML = `
           <div class="today-card">
             <div class="today-top">
               <div>
                 <div class="eyebrow">Today</div>
-                <h2 class="today-title">Nothing to do today</h2>
+                <h2 class="today-title">${escapeHtml(currentTask.stage)} — ${escapeHtml(currentTask.matter)}</h2>
               </div>
-              <div class="chip blue">Schedule is caught up</div>
+              <div style="display:flex;gap:6px;align-items:center">${loggedChip}${statusChip}</div>
             </div>
-            <p class="today-copy">No matter is eligible for today. That usually means every remaining application has a future call day or the active queue is already fully completed.</p>
+            <div class="today-meta">
+              <div class="chip blue">Call day ${formatDateShort(app.callDay)}</div>
+              <div class="chip blue">Deadline ${formatDateShort(app.deadline)}</div>
+              ${deadlineChip(app.deadline)}
+            </div>
+            <p class="today-copy">${copySessions}This is the next highest-priority eligible session under earliest-deadline-first scheduling. Recording completion rebuilds the queue instantly.</p>
+            ${progressHtml(completedCount, currentTask.stageIndex)}
+            <div class="today-actions">
+              <button class="btn primary" data-action="complete" data-app-id="${escapeAttr(currentTask.appId)}">Mark complete</button>
+              ${todaysActions.length ? `<button class="btn danger" data-action="undo-last-today">Undo last</button>` : ''}
+            </div>
           </div>
         `;
         return;
       }
 
-      const app = getApp(currentTask.appId);
-      const completedCount = completionCount(currentTask.appId);
+      // Today completions exist but no more eligible tasks remain for today.
+      if (todaysActions.length) {
+        const latest = todaysActions[todaysActions.length - 1];
+        const app = getApp(latest.appId);
+        const completedCount = completionCount(latest.appId);
+        const next = schedule.future[0] || null;
+        const nextCopy = next
+          ? `Next scheduled item is <strong>${escapeHtml(next.stage)}</strong> for <strong>${escapeHtml(next.matter)}</strong> on <strong>${formatDateLong(next.date)}</strong>.`
+          : 'All remaining work is complete.';
+        els.todayCard.innerHTML = `
+          <div class="today-card">
+            <div class="today-top">
+              <div>
+                <div class="eyebrow">Today</div>
+                <h2 class="today-title">Done for today — ${todaysActions.length} session${todaysActions.length > 1 ? 's' : ''} logged</h2>
+              </div>
+              <div class="chip green">${todaysActions.length} logged today</div>
+            </div>
+            <div class="today-meta">
+              <div class="chip blue">Deadline ${formatDateShort(app?.deadline || todayIso)}</div>
+              ${deadlineChip(app?.deadline || todayIso)}
+              <div class="chip amber">Last: ${escapeHtml(STAGES[latest.stageIndex])} for ${escapeHtml(app?.matter || 'matter')}</div>
+            </div>
+            <p class="today-copy">All eligible work for today is complete. ${nextCopy}</p>
+            ${progressHtml(completedCount, completedCount, completedCount >= STAGES.length)}
+            <div class="today-actions">
+              <button class="btn danger" data-action="undo-last-today">Undo last completion</button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
       els.todayCard.innerHTML = `
         <div class="today-card">
           <div class="today-top">
             <div>
               <div class="eyebrow">Today</div>
-              <h2 class="today-title">${escapeHtml(currentTask.stage)} — ${escapeHtml(currentTask.matter)}</h2>
+              <h2 class="today-title">Nothing to do today</h2>
             </div>
-            <div class="chip ${currentTask.late ? 'red' : 'green'}">${currentTask.late ? 'Planned late' : 'On track'}</div>
+            <div class="chip blue">Schedule is caught up</div>
           </div>
-          <div class="today-meta">
-            <div class="chip blue">Call day ${formatDateShort(app.callDay)}</div>
-            <div class="chip blue">Deadline ${formatDateShort(app.deadline)}</div>
-            ${deadlineChip(app.deadline)}
-          </div>
-          <p class="today-copy">This is the next highest-priority eligible session under earliest-deadline-first scheduling. Recording completion will rebuild the rest of the queue instantly.</p>
-          ${progressHtml(completedCount, currentTask.stageIndex)}
-          <div class="today-actions">
-            <button class="btn primary" data-action="complete" data-app-id="${escapeAttr(currentTask.appId)}">Mark complete</button>
-          </div>
+          <p class="today-copy">No matter is eligible for today. That usually means every remaining application has a future call day or the active queue is already fully completed.</p>
         </div>
       `;
     }
 
     function renderWarnings(schedule) {
-      if (!schedule.lateByApp.size) {
-        els.warningPanel.innerHTML = '';
-        return;
+      let html = '';
+
+      // Warn when working days have elapsed since the last logged session.  This surfaces
+      // situations where the user forgot to record completions or simply skipped days.
+      if (schedule.missedWorkdays > 0) {
+        const dayWord = schedule.missedWorkdays === 1 ? 'day has' : 'days have';
+        html += `
+          <section class="panel warning">
+            <h3>Sessions may have been missed</h3>
+            <p class="muted">${schedule.missedWorkdays} working ${dayWord} elapsed since your last logged session without any new completions recorded. If you completed work that was not yet logged, use the schedule list below to mark those sessions complete now.</p>
+          </section>
+        `;
       }
 
-      const lines = [...schedule.lateByApp.entries()].map(([appId, rows]) => {
-        const app = getApp(appId);
-        const details = rows.map((row) => `${row.stage} on ${formatDateShort(row.date)}`).join(', ');
-        return `<li><strong>${escapeHtml(app?.matter || appId)}</strong> misses its ${formatDateShort(app?.deadline || rows[0].deadline)} deadline. Late sessions: ${escapeHtml(details)}.</li>`;
-      }).join('');
+      if (schedule.lateByApp.size) {
+        const lines = [...schedule.lateByApp.entries()].map(([appId, rows]) => {
+          const app = getApp(appId);
+          const details = rows.map((row) => `${row.stage} on ${formatDateShort(row.date)}`).join(', ');
+          return `<li><strong>${escapeHtml(app?.matter || appId)}</strong> misses its ${formatDateShort(app?.deadline || rows[0].deadline)} deadline. Late sessions: ${escapeHtml(details)}.</li>`;
+        }).join('');
 
-      els.warningPanel.innerHTML = `
-        <section class="panel warning">
-          <h3>Overbooking detected</h3>
-          <p class="muted">At least one session is landing after deadline under the current queue, call days, OOO dates, and existing completions.</p>
-          <ul>${lines}</ul>
-        </section>
-      `;
+        html += `
+          <section class="panel warning">
+            <h3>Overbooking detected</h3>
+            <p class="muted">At least one session is landing after deadline under the current queue, call days, OOO dates, and existing completions.</p>
+            <ul>${lines}</ul>
+          </section>
+        `;
+      }
+
+      els.warningPanel.innerHTML = html;
     }
 
     function renderSchedule(schedule) {
