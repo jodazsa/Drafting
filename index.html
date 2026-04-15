@@ -763,15 +763,8 @@
       const stored = safeParse(localStorage.getItem(STORAGE_KEY), null);
       const raw = stored && typeof stored === 'object' ? stored : readLegacyState();
 
-      const normalized = {
-        apps: Array.isArray(raw.apps) ? raw.apps.filter(Boolean) : [],
-        clog: raw.clog && typeof raw.clog === 'object' ? raw.clog : {},
-        ooo: Array.isArray(raw.ooo) ? [...new Set(raw.ooo)].sort() : [],
-        actions: Array.isArray(raw.actions) ? raw.actions.filter(Boolean) : [],
-        calendarMonth: isIsoDate(raw.calendarMonth) ? raw.calendarMonth : startOfMonthIso(today())
-      };
-
-      normalized.apps = normalized.apps
+      const apps = (Array.isArray(raw.apps) ? raw.apps : [])
+        .filter(Boolean)
         .map((app) => ({
           id: app.id || uid(),
           matter: String(app.matter || '').trim(),
@@ -780,8 +773,16 @@
         }))
         .filter((app) => app.matter && isIsoDate(app.callDay) && isIsoDate(app.deadline));
 
-      reconcileActions(normalized);
-      return normalized;
+      const completionsRaw = Array.isArray(raw.completions)
+        ? raw.completions
+        : completionsFromLegacy(raw);
+
+      return {
+        apps,
+        completions: normalizeCompletions(completionsRaw, apps),
+        ooo: Array.isArray(raw.ooo) ? [...new Set(raw.ooo)].sort() : [],
+        calendarMonth: isIsoDate(raw.calendarMonth) ? raw.calendarMonth : startOfMonthIso(today())
+      };
     }
 
     function readLegacyState() {
@@ -795,37 +796,55 @@
       };
     }
 
-    function reconcileActions(targetState) {
-      const actionMap = new Map();
-      (targetState.actions || []).forEach((action) => {
-        if (!action || !action.appId || !isIsoDate(action.date)) return;
-        if (!actionMap.has(action.appId)) actionMap.set(action.appId, []);
-        actionMap.get(action.appId).push({
-          id: action.id || uid(),
-          appId: action.appId,
-          stageIndex: Number.isFinite(action.stageIndex) ? Number(action.stageIndex) : null,
-          date: action.date,
-          ts: Number.isFinite(action.ts) ? Number(action.ts) : Date.parse(action.date + 'T00:00:00')
+    function completionsFromLegacy(raw) {
+      // Prior formats stored two parallel structures: `actions` (flat records with
+      // stageIndex + ts) and `clog` (appId -> [date, ...]).  Prefer `actions` when
+      // present; fall back to `clog`.  stageIndex is dropped — it's now derived.
+      const actions = Array.isArray(raw.actions) ? raw.actions : [];
+      if (actions.length) {
+        return actions
+          .filter((a) => a && a.appId && isIsoDate(a.date))
+          .map((a) => ({
+            id: a.id || uid(),
+            appId: a.appId,
+            date: a.date,
+            ts: Number.isFinite(a.ts)
+              ? Number(a.ts)
+              : Date.parse(a.date + 'T00:00:00') + (Number.isFinite(a.stageIndex) ? Number(a.stageIndex) : 0)
+          }));
+      }
+      const clog = raw.clog && typeof raw.clog === 'object' ? raw.clog : {};
+      const out = [];
+      Object.entries(clog).forEach(([appId, dates]) => {
+        if (!Array.isArray(dates)) return;
+        dates.forEach((date, idx) => {
+          if (!isIsoDate(date)) return;
+          out.push({ id: uid(), appId, date, ts: Date.parse(date + 'T00:00:00') + idx });
+        });
+      });
+      return out;
+    }
+
+    function normalizeCompletions(entries, apps) {
+      const validAppIds = new Set(apps.map((a) => a.id));
+      const byApp = new Map();
+      (entries || []).forEach((c) => {
+        if (!c || !validAppIds.has(c.appId) || !isIsoDate(c.date)) return;
+        if (!byApp.has(c.appId)) byApp.set(c.appId, []);
+        byApp.get(c.appId).push({
+          id: c.id || uid(),
+          appId: c.appId,
+          date: c.date,
+          ts: Number.isFinite(c.ts) ? Number(c.ts) : Date.parse(c.date + 'T00:00:00')
         });
       });
 
-      const rebuilt = [];
-      targetState.apps.forEach((app) => {
-        const dates = Array.isArray(targetState.clog[app.id]) ? targetState.clog[app.id].filter(isIsoDate).slice(0, STAGES.length) : [];
-        targetState.clog[app.id] = dates;
-        const existing = (actionMap.get(app.id) || []).sort((a, b) => a.ts - b.ts);
-        dates.forEach((date, idx) => {
-          const prior = existing[idx];
-          rebuilt.push({
-            id: prior?.id || uid(),
-            appId: app.id,
-            stageIndex: idx,
-            date,
-            ts: prior?.ts || Date.parse(date + 'T00:00:00') + idx
-          });
-        });
+      const result = [];
+      byApp.forEach((list) => {
+        list.sort((a, b) => a.ts - b.ts);
+        list.slice(0, STAGES.length).forEach((c) => result.push(c));
       });
-      targetState.actions = rebuilt.sort((a, b) => a.ts - b.ts);
+      return result.sort((a, b) => a.ts - b.ts);
     }
 
     function safeParse(value, fallback) {
@@ -860,7 +879,6 @@
 
       const app = { id: uid(), matter, callDay, deadline };
       state.apps.push(app);
-      state.clog[app.id] = [];
       saveState();
       els.addForm.reset();
       renderAll();
@@ -872,8 +890,7 @@
       const ok = confirm('Remove ' + app.matter + '? This deletes its completion history too.');
       if (!ok) return;
       state.apps = state.apps.filter((item) => item.id !== appId);
-      delete state.clog[appId];
-      state.actions = state.actions.filter((action) => action.appId !== appId);
+      state.completions = state.completions.filter((c) => c.appId !== appId);
       saveState();
       renderAll();
     }
@@ -891,31 +908,20 @@
         return;
       }
 
-      const currentCount = completionCount(appId);
-      if (currentCount >= STAGES.length) return;
+      if (completionCount(appId) >= STAGES.length) return;
 
-      state.clog[appId] = [...(state.clog[appId] || []), todayIso];
-      state.actions.push({
-        id: uid(),
-        appId,
-        stageIndex: currentCount,
-        date: todayIso,
-        ts: Date.now()
-      });
+      state.completions.push({ id: uid(), appId, date: todayIso, ts: Date.now() });
+      state.completions.sort((a, b) => a.ts - b.ts);
       saveState();
       renderAll();
     }
 
     function undoLastTodayCompletion() {
       const todayIso = iso(today());
-      const todays = state.actions.filter((action) => action.date === todayIso).sort((a, b) => a.ts - b.ts);
+      const todays = state.completions.filter((c) => c.date === todayIso);
       const last = todays[todays.length - 1];
       if (!last) return;
-      const entries = state.clog[last.appId] || [];
-      if (!entries.length) return;
-      state.clog[last.appId] = entries.slice(0, -1);
-      state.actions = state.actions.filter((action) => action.id !== last.id);
-      reconcileActions(state);
+      state.completions = state.completions.filter((c) => c.id !== last.id);
       saveState();
       renderAll();
     }
@@ -926,9 +932,13 @@
       const stageName = STAGES[stageIndex] || 'that stage';
       const ok = confirm('Reopen ' + app.matter + ' from ' + stageName + '? This removes that completion and any later completions for the same matter.');
       if (!ok) return;
-      state.clog[appId] = (state.clog[appId] || []).slice(0, stageIndex);
-      state.actions = state.actions.filter((action) => !(action.appId === appId && action.stageIndex >= stageIndex));
-      reconcileActions(state);
+      const keep = new Set(
+        state.completions
+          .filter((c) => c.appId === appId)
+          .slice(0, stageIndex)
+          .map((c) => c.id)
+      );
+      state.completions = state.completions.filter((c) => c.appId !== appId || keep.has(c.id));
       saveState();
       renderAll();
     }
@@ -950,9 +960,8 @@
       const payload = {
         exportedAt: new Date().toISOString(),
         apps: state.apps,
-        clog: state.clog,
+        completions: state.completions,
         ooo: state.ooo,
-        actions: state.actions,
         calendarMonth: state.calendarMonth
       };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -971,19 +980,14 @@
       reader.onload = () => {
         try {
           const parsed = JSON.parse(String(reader.result || '{}'));
-          const incoming = {
-            apps: Array.isArray(parsed.apps) ? parsed.apps : [],
-            clog: parsed.clog && typeof parsed.clog === 'object' ? parsed.clog : {},
-            ooo: Array.isArray(parsed.ooo) ? parsed.ooo : [],
-            actions: Array.isArray(parsed.actions) ? parsed.actions : [],
-            calendarMonth: isIsoDate(parsed.calendarMonth) ? parsed.calendarMonth : startOfMonthIso(today())
-          };
-          state.apps = incoming.apps;
-          state.clog = incoming.clog;
-          state.ooo = [...new Set(incoming.ooo)].sort();
-          state.actions = incoming.actions;
-          state.calendarMonth = incoming.calendarMonth;
-          reconcileActions(state);
+          const apps = Array.isArray(parsed.apps) ? parsed.apps : [];
+          const completionsRaw = Array.isArray(parsed.completions)
+            ? parsed.completions
+            : completionsFromLegacy(parsed);
+          state.apps = apps;
+          state.completions = normalizeCompletions(completionsRaw, apps);
+          state.ooo = [...new Set(Array.isArray(parsed.ooo) ? parsed.ooo : [])].sort();
+          state.calendarMonth = isIsoDate(parsed.calendarMonth) ? parsed.calendarMonth : startOfMonthIso(today());
           saveState();
           renderAll();
         } catch (error) {
@@ -999,9 +1003,8 @@
       const ok = confirm('Reset all applications, completions, and OOO dates?');
       if (!ok) return;
       state.apps = [];
-      state.clog = {};
+      state.completions = [];
       state.ooo = [];
-      state.actions = [];
       state.calendarMonth = startOfMonthIso(today());
       saveState();
       renderAll();
@@ -1084,24 +1087,33 @@
         if (!nextByApp[row.appId]) nextByApp[row.appId] = row;
       });
 
-      const recentCompleted = state.actions
-        .sort((a, b) => a.ts - b.ts)
-        .map((action) => {
-          const app = byId.get(action.appId);
-          if (!app) return null;
-          return {
+      // Derive stage index per completion from ts order within its app.
+      const completionsByApp = new Map();
+      state.completions.forEach((c) => {
+        if (!byId.has(c.appId)) return;
+        if (!completionsByApp.has(c.appId)) completionsByApp.set(c.appId, []);
+        completionsByApp.get(c.appId).push(c);
+      });
+      const recentCompleted = [];
+      completionsByApp.forEach((list, appId) => {
+        list.sort((a, b) => a.ts - b.ts);
+        const app = byId.get(appId);
+        list.forEach((c, stageIndex) => {
+          recentCompleted.push({
             type: 'done',
-            date: action.date,
-            appId: action.appId,
+            date: c.date,
+            appId,
             matter: app.matter,
-            stageIndex: action.stageIndex,
-            stage: STAGES[action.stageIndex],
+            stageIndex,
+            stage: STAGES[stageIndex],
             deadline: app.deadline,
             callDay: app.callDay,
-            ts: action.ts
-          };
-        })
-        .filter(Boolean);
+            ts: c.ts,
+            completionId: c.id
+          });
+        });
+      });
+      recentCompleted.sort((a, b) => a.ts - b.ts);
 
       const lateByApp = new Map();
       future.filter((row) => row.late).forEach((row) => {
@@ -1112,10 +1124,10 @@
       // Count workdays that have elapsed since the last logged completion where there was eligible
       // work to do.  These are days the user may have skipped without recording a session.
       let missedWorkdays = 0;
-      if (state.actions.length > 0) {
-        const lastActionDate = state.actions.reduce((max, a) => (a.date > max ? a.date : max), '');
-        if (lastActionDate && lastActionDate < todayIso) {
-          let mc = addDays(fromIso(lastActionDate), 1);
+      if (state.completions.length > 0) {
+        const lastDate = state.completions.reduce((max, c) => (c.date > max ? c.date : max), '');
+        if (lastDate && lastDate < todayIso) {
+          let mc = addDays(fromIso(lastDate), 1);
           while (iso(mc) < todayIso) {
             const mcIso = iso(mc);
             if (isWorkday(mcIso)) {
@@ -1151,7 +1163,7 @@
 
     function renderTodayCard(schedule) {
       const todayIso = schedule.todayIso;
-      const todaysActions = state.actions.filter((action) => action.date === todayIso).sort((a, b) => a.ts - b.ts);
+      const todaysDone = schedule.recentCompleted.filter((r) => r.date === todayIso);
       const workday = isWorkday(todayIso);
       const firstFuture = schedule.future[0] || null;
       const currentTask = firstFuture && firstFuture.date === todayIso ? firstFuture : null;
@@ -1194,12 +1206,12 @@
       if (currentTask) {
         const app = getApp(currentTask.appId);
         const completedCount = completionCount(currentTask.appId);
-        const loggedChip = todaysActions.length
-          ? `<div class="chip green">${todaysActions.length} logged today</div>`
+        const loggedChip = todaysDone.length
+          ? `<div class="chip green">${todaysDone.length} logged today</div>`
           : '';
         const statusChip = `<div class="chip ${currentTask.late ? 'red' : 'green'}">${currentTask.late ? 'Planned late' : 'On track'}</div>`;
-        const copySessions = todaysActions.length
-          ? `${todaysActions.length} session${todaysActions.length > 1 ? 's' : ''} already logged today. `
+        const copySessions = todaysDone.length
+          ? `${todaysDone.length} session${todaysDone.length > 1 ? 's' : ''} already logged today. `
           : '';
         els.todayCard.innerHTML = `
           <div class="today-card">
@@ -1219,7 +1231,7 @@
             ${progressHtml(completedCount, currentTask.stageIndex)}
             <div class="today-actions">
               <button class="btn primary" data-action="complete" data-app-id="${escapeHtml(currentTask.appId)}">Mark complete</button>
-              ${todaysActions.length ? `<button class="btn danger" data-action="undo-last-today">Undo last</button>` : ''}
+              ${todaysDone.length ? `<button class="btn danger" data-action="undo-last-today">Undo last</button>` : ''}
             </div>
           </div>
         `;
@@ -1227,8 +1239,8 @@
       }
 
       // Today completions exist but no more eligible tasks remain for today.
-      if (todaysActions.length) {
-        const latest = todaysActions[todaysActions.length - 1];
+      if (todaysDone.length) {
+        const latest = todaysDone[todaysDone.length - 1];
         const app = getApp(latest.appId);
         const completedCount = completionCount(latest.appId);
         const next = schedule.future[0] || null;
@@ -1240,14 +1252,14 @@
             <div class="today-top">
               <div>
                 <div class="eyebrow">Today</div>
-                <h2 class="today-title">Done for today — ${todaysActions.length} session${todaysActions.length > 1 ? 's' : ''} logged</h2>
+                <h2 class="today-title">Done for today — ${todaysDone.length} session${todaysDone.length > 1 ? 's' : ''} logged</h2>
               </div>
-              <div class="chip green">${todaysActions.length} logged today</div>
+              <div class="chip green">${todaysDone.length} logged today</div>
             </div>
             <div class="today-meta">
               <div class="chip blue">Deadline ${formatDateShort(app?.deadline || todayIso)}</div>
               ${deadlineChip(app?.deadline || todayIso)}
-              <div class="chip amber">Last: ${escapeHtml(STAGES[latest.stageIndex])} for ${escapeHtml(app?.matter || 'matter')}</div>
+              <div class="chip amber">Last: ${escapeHtml(latest.stage)} for ${escapeHtml(app?.matter || 'matter')}</div>
             </div>
             <p class="today-copy">All eligible work for today is complete. ${nextCopy}</p>
             ${progressHtml(completedCount, completedCount, completedCount >= STAGES.length)}
@@ -1479,7 +1491,9 @@
     }
 
     function completionCount(appId) {
-      return Math.min((state.clog[appId] || []).length, STAGES.length);
+      let n = 0;
+      for (const c of state.completions) if (c.appId === appId) n += 1;
+      return Math.min(n, STAGES.length);
     }
 
     function compareApps(a, b) {
