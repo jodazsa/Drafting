@@ -763,7 +763,6 @@
         if (!action) return;
         const type = action.dataset.action;
         if (type === 'complete') completeStage(action.dataset.appId);
-        if (type === 'complete-next') completeNextDueToday();
         if (type === 'undo-last-today') undoLastTodayCompletion();
       });
 
@@ -910,7 +909,7 @@
       const app = getApp(appId);
       if (!app) return;
       const todayIso = iso(today());
-      if (!isSchedulableToday(todayIso)) {
+      if (!isWorkday(todayIso)) {
         alert('Today is not an available working day. Only Monday through Thursday days that are not marked OOO can be completed.');
         return;
       }
@@ -932,13 +931,6 @@
       });
       saveState();
       renderAll();
-    }
-
-    function completeNextDueToday() {
-      const schedule = buildSchedule();
-      const next = schedule.future[0];
-      if (!next) return;
-      completeStage(next.appId);
     }
 
     function undoLastTodayCompletion() {
@@ -1064,19 +1056,16 @@
     function buildSchedule() {
       const todayDate = today();
       const todayIso = iso(todayDate);
-      const hasTodayCompletion = state.actions.some((action) => action.date === todayIso);
       // Always start from today so the user can complete more than one session on a single day.
       // The remaining-count map already accounts for all prior completions, so the scheduler
       // naturally picks up where the user left off rather than pushing everything to tomorrow.
-      const startDate = todayDate;
-      const startIso = iso(startDate);
       const byId = new Map(state.apps.map((app) => [app.id, app]));
       const remaining = new Map(state.apps.map((app) => [app.id, completionCount(app.id)]));
       const future = [];
       const bookedByDate = {};
       const appsSorted = [...state.apps].sort(compareApps);
       const maxSteps = Math.max(3650, state.apps.length * 20);
-      let cursor = new Date(startDate);
+      let cursor = new Date(todayDate);
       let steps = 0;
 
       while ([...remaining.values()].some((count) => count < STAGES.length) && steps < maxSteps) {
@@ -1175,8 +1164,6 @@
 
       return {
         todayIso,
-        startIso,
-        hasTodayCompletion,
         future,
         nextByApp,
         recentCompleted,
@@ -1260,7 +1247,7 @@
             <p class="today-copy">${copySessions}This is the next highest-priority eligible session under earliest-deadline-first scheduling. Recording completion rebuilds the queue instantly.</p>
             ${progressHtml(completedCount, currentTask.stageIndex)}
             <div class="today-actions">
-              <button class="btn primary" data-action="complete" data-app-id="${escapeAttr(currentTask.appId)}">Mark complete</button>
+              <button class="btn primary" data-action="complete" data-app-id="${escapeHtml(currentTask.appId)}">Mark complete</button>
               ${todaysActions.length ? `<button class="btn danger" data-action="undo-last-today">Undo last</button>` : ''}
             </div>
           </div>
@@ -1379,14 +1366,14 @@
     function renderScheduleRow(row, schedule) {
       const app = getApp(row.appId);
       const nextForApp = schedule.nextByApp[row.appId];
-      const clickableFuture = row.type === 'future' && nextForApp && nextForApp.stageIndex === row.stageIndex && nextForApp.date === row.date && app && app.callDay <= schedule.todayIso && isSchedulableToday(schedule.todayIso);
+      const clickableFuture = row.type === 'future' && nextForApp && nextForApp.stageIndex === row.stageIndex && nextForApp.date === row.date && app && app.callDay <= schedule.todayIso && isWorkday(schedule.todayIso);
       const classes = ['row'];
       if (row.type === 'done') classes.push('completed', 'clickable-done');
       if (row.late) classes.push('late');
 
       const rightChips = row.type === 'done'
         ? `<div class="hint done">↺ reopen</div>`
-        : `${deadlineChip(row.deadline)}${clickableFuture ? `<button class="btn small secondary inline" data-action="complete" data-app-id="${escapeAttr(row.appId)}">${row.date > schedule.todayIso ? 'Mark complete early' : 'Mark complete'}</button>` : '<div class="hint future">✓ mark done</div>'}`;
+        : `${deadlineChip(row.deadline)}${clickableFuture ? `<button class="btn small secondary inline" data-action="complete" data-app-id="${escapeHtml(row.appId)}">${row.date > schedule.todayIso ? 'Mark complete early' : 'Mark complete'}</button>` : '<div class="hint future">✓ mark done</div>'}`;
 
       const status = row.type === 'done'
         ? `<span class="chip green">Completed</span>`
@@ -1399,7 +1386,7 @@
       return `
         <div
           class="${classes.join(' ')}"
-          ${row.type === 'done' ? `data-row-action="reopen" data-app-id="${escapeAttr(row.appId)}" data-stage-index="${row.stageIndex}"` : ''}
+          ${row.type === 'done' ? `data-row-action="reopen" data-app-id="${escapeHtml(row.appId)}" data-stage-index="${row.stageIndex}"` : ''}
         >
           <div class="row-left">
             <div class="row-title">
@@ -1438,7 +1425,7 @@
               </div>
               <div class="app-actions">
                 ${overdue ? '<span class="chip red">Late</span>' : count >= STAGES.length ? '<span class="chip green">Done</span>' : '<span class="chip amber">Active</span>'}
-                <button class="btn small danger" data-remove-app="${escapeAttr(app.id)}">Remove</button>
+                <button class="btn small danger" data-remove-app="${escapeHtml(app.id)}">Remove</button>
               </div>
             </div>
             ${progressHtml(count, next?.stageIndex ?? count, count >= STAGES.length)}
@@ -1502,7 +1489,7 @@
               ? 'done'
               : (treatAllDone ? 'done' : idx === currentStageIndex && completedCount < STAGES.length ? 'current' : 'pending');
             const label = STAGES[idx];
-            return `<div class="stage-pill ${cls}" title="${escapeAttr(label)}">${abbr}</div>`;
+            return `<div class="stage-pill ${cls}" title="${escapeHtml(label)}">${abbr}</div>`;
           }).join('')}
         </div>
       `;
@@ -1536,10 +1523,6 @@
       const day = date.getDay();
       if (day < 1 || day > 4) return false;
       return !state.ooo.includes(iso(date));
-    }
-
-    function isSchedulableToday(dateIso) {
-      return isWorkday(dateIso);
     }
 
     function today() {
@@ -1605,10 +1588,6 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-    }
-
-    function escapeAttr(value) {
-      return escapeHtml(value);
     }
   </script>
 </body>
