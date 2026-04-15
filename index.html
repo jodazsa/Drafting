@@ -125,14 +125,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .app-rm{background:none;border:none;color:var(--hint);font-size:16px;cursor:pointer;line-height:1;padding:0 2px;}
 .app-rm:hover{color:var(--red);}
 .app-meta{font-size:10px;color:var(--muted);line-height:1.65;margin-bottom:6px;}
-.prog-bars{display:flex;gap:2px;margin-bottom:2px;}
-.prog-bar{flex:1;height:3px;border-radius:2px;background:#e8e5de;}
-.prog-bar.done{background:var(--green);}
-.prog-bar.cur{background:var(--amber);}
-.prog-names{display:flex;gap:2px;}
-.prog-name{flex:1;font-size:7.5px;text-align:center;color:var(--hint);text-transform:uppercase;letter-spacing:.3px;overflow:hidden;white-space:nowrap;}
-.prog-name.done{color:var(--green);}
-.prog-name.cur{color:var(--amber);}
+.prog-cols{display:flex;gap:2px;margin-top:2px;}
+.prog-col{flex:1;min-width:0;padding:2px 1px 1px;border-radius:4px;transition:background .12s;}
+.prog-col-bar{height:3px;border-radius:2px;background:#e8e5de;margin-bottom:3px;}
+.prog-col-bar.done{background:var(--green);}
+.prog-col-bar.cur{background:var(--amber);}
+.prog-col-name{font-size:7.5px;text-align:center;color:var(--hint);text-transform:uppercase;letter-spacing:.3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.prog-col-name.done{color:var(--green);}
+.prog-col-name.cur{color:var(--amber);}
+.prog-col.clickable{cursor:pointer;}
+.prog-col.clickable:hover{background:#f0efe9;}
+.prog-col.cur.clickable:hover{background:#fff0cc;}
+.prog-col.done.clickable:hover{background:#edf7f0;}
+.prog-col.disabled{opacity:.55;cursor:not-allowed;}
 .apps-empty{padding:20px 14px;text-align:center;color:var(--muted);font-size:13px;}
 
 /* ── Add form ── */
@@ -422,7 +427,7 @@ function renderAll(){
   /* ── Schedule ── */
   if(!apps.length){
     document.getElementById('schedule').innerHTML='<div class="empty-state">Add an application to get started.</div>';
-    renderSide(totalDone,bookedDates);
+    renderSide(totalDone,bookedDates,doneToday);
     return;
   }
 
@@ -515,10 +520,10 @@ function renderAll(){
   }
 
   document.getElementById('schedule').innerHTML=html;
-  renderSide(totalDone,bookedDates);
+  renderSide(totalDone,bookedDates,doneToday);
 }
 
-function renderSide(totalDone,bookedDates){
+function renderSide(totalDone,bookedDates,doneToday){
   /* Apps list */
   let appsHTML='';
   if(!apps.length){
@@ -529,11 +534,35 @@ function renderSide(totalDone,bookedDates){
       const dLeft=daysBetween(TODAY,a.deadline);
       const dlStr=isComplete?'Complete':dLeft>=0?dLeft+'d to deadline':Math.abs(dLeft)+'d overdue';
       const dlC=isComplete?'var(--green)':dLeft<0?'var(--red)':dLeft<=5?'var(--amber)':'var(--muted)';
+      const progHTML=SESSIONS.map((_,i)=>{
+        const isDone=i<done;
+        const isCur=i===done&&!isComplete;
+        let cls='prog-col'+(isDone?' done':isCur?' cur':'');
+        let click='',title='';
+        if(isDone){
+          cls+=' clickable';
+          click=' onclick="reopenSess(\''+a.id+'\','+i+')"';
+          title=' title="Reopen '+SESSIONS[i]+'"';
+        } else if(isCur&&!doneToday){
+          cls+=' clickable';
+          click=' onclick="markDone(\''+a.id+'\')"';
+          title=' title="Mark '+SESSIONS[i]+' complete"';
+        } else if(isCur&&doneToday){
+          cls+=' disabled';
+          title=' title="Already completed a session today"';
+        } else {
+          cls+=' disabled';
+          title=' title="Complete earlier sessions first"';
+        }
+        return '<div class="'+cls+'"'+click+title+'>'+
+          '<div class="prog-col-bar'+(isDone?' done':isCur?' cur':'')+'"></div>'+
+          '<div class="prog-col-name'+(isDone?' done':isCur?' cur':'')+'">'+SESS_S[i]+'</div>'+
+          '</div>';
+      }).join('');
       return '<div class="app-item">'+
         '<div class="app-top"><div class="app-mn">'+a.matter+'</div><button class="app-rm" onclick="removeApp(\''+a.id+'\')">&times;</button></div>'+
         '<div class="app-meta">Call: '+fmtShort(a.callDay)+' &middot; Deadline: '+fmtShort(a.deadline)+'<br><span style="color:'+dlC+'">'+dlStr+'</span></div>'+
-        '<div class="prog-bars">'+SESSIONS.map((_,i)=>'<div class="prog-bar'+(i<done?' done':i===done&&!isComplete?' cur':'')+'"></div>').join('')+'</div>'+
-        '<div class="prog-names">'+SESS_S.map((s,i)=>'<div class="prog-name'+(i<done?' done':i===done&&!isComplete?' cur':'')+'">'+s+'</div>').join('')+'</div>'+
+        '<div class="prog-cols">'+progHTML+'</div>'+
         '</div>';
     }).join('');
   }
