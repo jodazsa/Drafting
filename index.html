@@ -678,7 +678,8 @@
   <script>
     const STAGES = ['Claims', 'Drawings', 'Write', 'First Edit', 'Second Edit', 'Proof'];
     const STAGE_ABBR = ['CL', 'DR', 'WR', 'E1', 'E2', 'PF'];
-    const STORAGE_KEYS = {
+    const STORAGE_KEY = 'pws_state';
+    const LEGACY_KEYS = {
       apps: 'pws_apps',
       clog: 'pws_clog',
       ooo: 'pws_ooo',
@@ -759,18 +760,15 @@
     }
 
     function loadState() {
-      const apps = safeParse(localStorage.getItem(STORAGE_KEYS.apps), []);
-      const clog = safeParse(localStorage.getItem(STORAGE_KEYS.clog), {});
-      const ooo = safeParse(localStorage.getItem(STORAGE_KEYS.ooo), []);
-      const actions = safeParse(localStorage.getItem(STORAGE_KEYS.actions), []);
-      const calendarMonth = localStorage.getItem(STORAGE_KEYS.calendarMonth) || startOfMonthIso(today());
+      const stored = safeParse(localStorage.getItem(STORAGE_KEY), null);
+      const raw = stored && typeof stored === 'object' ? stored : readLegacyState();
 
       const normalized = {
-        apps: Array.isArray(apps) ? apps.filter(Boolean) : [],
-        clog: clog && typeof clog === 'object' ? clog : {},
-        ooo: Array.isArray(ooo) ? [...new Set(ooo)].sort() : [],
-        actions: Array.isArray(actions) ? actions.filter(Boolean) : [],
-        calendarMonth
+        apps: Array.isArray(raw.apps) ? raw.apps.filter(Boolean) : [],
+        clog: raw.clog && typeof raw.clog === 'object' ? raw.clog : {},
+        ooo: Array.isArray(raw.ooo) ? [...new Set(raw.ooo)].sort() : [],
+        actions: Array.isArray(raw.actions) ? raw.actions.filter(Boolean) : [],
+        calendarMonth: isIsoDate(raw.calendarMonth) ? raw.calendarMonth : startOfMonthIso(today())
       };
 
       normalized.apps = normalized.apps
@@ -784,6 +782,17 @@
 
       reconcileActions(normalized);
       return normalized;
+    }
+
+    function readLegacyState() {
+      // Back-compat: prior versions wrote five separate pws_* keys.
+      return {
+        apps: safeParse(localStorage.getItem(LEGACY_KEYS.apps), []),
+        clog: safeParse(localStorage.getItem(LEGACY_KEYS.clog), {}),
+        ooo: safeParse(localStorage.getItem(LEGACY_KEYS.ooo), []),
+        actions: safeParse(localStorage.getItem(LEGACY_KEYS.actions), []),
+        calendarMonth: localStorage.getItem(LEGACY_KEYS.calendarMonth) || ''
+      };
     }
 
     function reconcileActions(targetState) {
@@ -825,11 +834,9 @@
     }
 
     function saveState() {
-      localStorage.setItem(STORAGE_KEYS.apps, JSON.stringify(state.apps));
-      localStorage.setItem(STORAGE_KEYS.clog, JSON.stringify(state.clog));
-      localStorage.setItem(STORAGE_KEYS.ooo, JSON.stringify(state.ooo));
-      localStorage.setItem(STORAGE_KEYS.actions, JSON.stringify(state.actions));
-      localStorage.setItem(STORAGE_KEYS.calendarMonth, state.calendarMonth);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      // Purge old multi-key format so it can't drift.
+      Object.values(LEGACY_KEYS).forEach((key) => localStorage.removeItem(key));
     }
 
     function onAddApp(event) {
@@ -1009,8 +1016,6 @@
     }
 
     function renderAll() {
-      reconcileActions(state);
-      saveState();
       const schedule = buildSchedule();
       renderTodayCard(schedule);
       renderWarnings(schedule);
