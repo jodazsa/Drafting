@@ -7,14 +7,14 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
-  --paper:#f4f4ef;
-  --panel:#fbfbf8;
-  --panel-alt:#f0efe8;
-  --ink:#111111;
-  --muted:#6f6b62;
-  --warm-gray:#9a978d;
-  --line:#1a1a1a;
-  --line-soft:#c9c5b8;
+  --paper:#ffffff;
+  --panel:#ffffff;
+  --panel-alt:#ffffff;
+  --ink:#000000;
+  --muted:#000000;
+  --warm-gray:#000000;
+  --line:#000000;
+  --line-soft:#000000;
   --nasa-red:#d63b31;
   --green:#1f5136;
   --red:#b53027;
@@ -131,7 +131,7 @@ body{
 .sec-label:first-child{margin-top:0;}
 .conf{
   border:2px solid var(--nasa-red);
-  background:#faf2f1;
+  background:#ffffff;
   padding:.9rem 1rem;
   margin-bottom:.85rem;
 }
@@ -173,10 +173,10 @@ body{
 }
 .srow:first-of-type{border-top:1px solid var(--line);}
 .srow.today-row{border-left:6px solid var(--nasa-red);}
-.srow.past-row{background:#f0efe8;color:var(--muted);}
+.srow.past-row{background:#ffffff;color:#000000;}
 .srow.done-row{cursor:pointer;}
-.srow.done-row:hover{background:#eceae2;}
-.srow.late-row{background:#faf2f1;}
+.srow.done-row:hover{background:#ffffff;}
+.srow.late-row{background:#ffffff;}
 .srow-date,.srow-matter,.srow-sess,.chk-wrap{padding:.78rem .8rem;}
 .srow-date,.srow-matter,.srow-sess{border-right:1px solid var(--line-soft);}
 .srow-date-main{font-size:12px;}
@@ -228,7 +228,7 @@ body{
 .chk.disabled{opacity:.35;cursor:not-allowed;}
 .chk.disabled:hover{background:var(--panel);}
 .chk.missed{border-color:var(--amber);}
-.chk.missed:hover{background:#f5efe0;}
+.chk.missed:hover{background:#ffffff;}
 .empty-state{
   border:1px solid var(--line);
   background:var(--panel);
@@ -253,7 +253,7 @@ body{
 .prog-cols{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-top:.1rem;}
 .prog-col{padding:.18rem .1rem .12rem;cursor:pointer;border:1px solid transparent;}
 .prog-col:hover{border-color:var(--line-soft);background:var(--panel-alt);}
-.prog-col-bar{height:5px;background:#d4d1c7;margin-bottom:4px;}
+.prog-col-bar{height:5px;background:#000000;margin-bottom:4px;}
 .prog-col-bar.done{background:var(--ink);}
 .prog-col-bar.cur{background:var(--nasa-red);}
 .prog-col-name{font-size:8px;text-align:center;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
