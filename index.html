@@ -1,1 +1,727 @@
-insert code here
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Application Planner</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --paper:#f4f4ef;
+  --panel:#fbfbf8;
+  --panel-alt:#f0efe8;
+  --ink:#111111;
+  --muted:#6f6b62;
+  --warm-gray:#9a978d;
+  --line:#1a1a1a;
+  --line-soft:#c9c5b8;
+  --nasa-red:#d63b31;
+  --green:#1f5136;
+  --red:#b53027;
+  --amber:#8a5c12;
+}
+html,body{height:100%;}
+body{
+  font-family:Helvetica,Arial,sans-serif;
+  background:var(--paper);
+  color:var(--ink);
+  line-height:1.3;
+}
+.mono{font-family:"Courier New",Courier,monospace;}
+.topbar{
+  border-bottom:3px solid var(--line);
+  background:var(--panel);
+  padding:1.25rem 1.25rem 1rem;
+}
+.topbar-inner{
+  max-width:1280px;
+  margin:0 auto;
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  gap:1.5rem;
+}
+.topbar-brand{
+  display:flex;
+  align-items:flex-end;
+  gap:1rem;
+  min-width:0;
+}
+.worm{
+  width:180px;
+  height:auto;
+  flex:0 0 auto;
+}
+.brand-copy{display:flex;flex-direction:column;gap:.25rem;min-width:0;}
+.topbar-eyebrow{
+  font-size:11px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.topbar-title{
+  font-size:30px;
+  font-weight:700;
+  line-height:1;
+  letter-spacing:.02em;
+}
+.topbar-sub{
+  font-size:14px;
+  color:var(--muted);
+  max-width:700px;
+}
+.topbar-stats{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(90px,1fr));
+  gap:.5rem;
+  min-width:420px;
+}
+.tstat{
+  border:1px solid var(--line);
+  background:var(--panel);
+  padding:.55rem .7rem .5rem;
+  min-height:64px;
+}
+.tstat-l{
+  display:block;
+  font-size:10px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.tstat-v{
+  display:block;
+  margin-top:.25rem;
+  font-size:17px;
+  font-weight:700;
+}
+.tstat-v.alarm{color:var(--nasa-red);}
+.wrap{
+  max-width:1280px;
+  margin:0 auto;
+  padding:1rem 1.25rem 2rem;
+  display:grid;
+  grid-template-columns:minmax(0,2.1fr) minmax(300px,1fr);
+  gap:1rem;
+  align-items:start;
+}
+.col-main,.col-side{min-width:0;}
+.col-side{display:flex;flex-direction:column;gap:1rem;}
+.sec-label{
+  margin:.95rem 0 .45rem;
+  padding:.4rem 0 .2rem;
+  border-top:2px solid var(--line);
+  font-size:11px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:var(--muted);
+  font-weight:700;
+}
+.sec-label:first-child{margin-top:0;}
+.conf{
+  border:2px solid var(--nasa-red);
+  background:#faf2f1;
+  padding:.9rem 1rem;
+  margin-bottom:.85rem;
+}
+.conf-hdr{
+  font-size:12px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.1em;
+  color:var(--nasa-red);
+  margin-bottom:.45rem;
+}
+.conf-item{font-size:13px;line-height:1.55;}
+.conf-mn{font-weight:700;}
+.done-today-bar{
+  border:1px solid var(--line);
+  background:var(--panel-alt);
+  padding:.8rem 1rem;
+  margin-bottom:.75rem;
+}
+.done-today-item{display:flex;justify-content:space-between;align-items:center;gap:1rem;}
+.done-today-item + .done-today-item{margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--line-soft);}
+.done-today-item strong{font-weight:700;}
+.undo-btn{
+  border:1px solid var(--line);
+  background:var(--panel);
+  color:var(--ink);
+  padding:.28rem .7rem;
+  font-size:11px;
+  cursor:pointer;
+}
+.undo-btn:hover{background:var(--panel-alt);}
+.srow{
+  display:grid;
+  grid-template-columns:150px 118px minmax(0,1fr) 62px;
+  align-items:stretch;
+  border:1px solid var(--line);
+  border-top:none;
+  background:var(--panel);
+}
+.srow:first-of-type{border-top:1px solid var(--line);}
+.srow.today-row{border-left:6px solid var(--nasa-red);}
+.srow.past-row{background:#f0efe8;color:var(--muted);}
+.srow.done-row{cursor:pointer;}
+.srow.done-row:hover{background:#eceae2;}
+.srow.late-row{background:#faf2f1;}
+.srow-date,.srow-matter,.srow-sess,.chk-wrap{padding:.78rem .8rem;}
+.srow-date,.srow-matter,.srow-sess{border-right:1px solid var(--line-soft);}
+.srow-date-main{font-size:12px;}
+.srow-date-main.ist{font-weight:700;color:var(--nasa-red);}
+.today-chip{
+  display:inline-block;
+  margin-top:.35rem;
+  border:1px solid var(--nasa-red);
+  color:var(--nasa-red);
+  padding:1px 6px;
+  font-size:9px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  font-weight:700;
+}
+.srow-matter{font-size:13px;font-weight:700;}
+.srow-sess{display:flex;align-items:center;gap:.75rem;min-width:0;}
+.sess-badge{
+  display:inline-flex;
+  align-items:center;
+  padding:.28rem .55rem;
+  border:1px solid var(--line);
+  font-size:10px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  font-weight:700;
+  white-space:nowrap;
+}
+.srow-spacer{flex:1 1 auto;min-width:.5rem;}
+.srow-dl{font-size:11px;color:var(--muted);white-space:nowrap;}
+.srow-dl.tight{color:var(--amber);font-weight:700;}
+.srow-dl.over{color:var(--nasa-red);font-weight:700;}
+.srow-hint{font-size:10px;color:var(--muted);white-space:nowrap;}
+.srow-hint.reopen-hint{color:var(--nasa-red);}
+.chk-wrap{display:flex;align-items:center;justify-content:center;}
+.chk{
+  width:25px;
+  height:25px;
+  border:1px solid var(--line);
+  background:var(--panel);
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.chk:hover{background:var(--panel-alt);}
+.chk.checked{background:var(--ink);border-color:var(--ink);color:#fff;}
+.chk.checked::after{content:'✓';font-size:14px;font-weight:700;}
+.chk.disabled{opacity:.35;cursor:not-allowed;}
+.chk.disabled:hover{background:var(--panel);}
+.chk.missed{border-color:var(--amber);}
+.chk.missed:hover{background:#f5efe0;}
+.empty-state{
+  border:1px solid var(--line);
+  background:var(--panel);
+  padding:2.5rem 1rem;
+  text-align:center;
+  color:var(--muted);
+  font-size:14px;
+}
+.card,.add-card{
+  border:1px solid var(--line);
+  background:var(--panel);
+}
+.card-hdr{padding:.8rem .9rem;border-bottom:1px solid var(--line-soft);display:flex;justify-content:space-between;align-items:center;}
+.card-title{font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--muted);}
+.app-item{padding:.85rem .9rem;border-top:1px solid var(--line-soft);}
+.app-item:first-child{border-top:none;}
+.app-top{display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;margin-bottom:.4rem;}
+.app-mn{font-size:16px;font-weight:700;}
+.app-rm{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1;}
+.app-rm:hover{color:var(--nasa-red);}
+.app-meta{font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:.55rem;}
+.prog-cols{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-top:.1rem;}
+.prog-col{padding:.18rem .1rem .12rem;cursor:pointer;border:1px solid transparent;}
+.prog-col:hover{border-color:var(--line-soft);background:var(--panel-alt);}
+.prog-col-bar{height:5px;background:#d4d1c7;margin-bottom:4px;}
+.prog-col-bar.done{background:var(--ink);}
+.prog-col-bar.cur{background:var(--nasa-red);}
+.prog-col-name{font-size:8px;text-align:center;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.prog-col-name.done{color:var(--ink);font-weight:700;}
+.prog-col-name.cur{color:var(--nasa-red);font-weight:700;}
+.apps-empty{padding:1.5rem .9rem;text-align:center;color:var(--muted);font-size:13px;}
+.add-card{padding:.95rem;}
+.add-title{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem;}
+.field{margin-bottom:.7rem;}
+.field label{display:block;margin-bottom:.25rem;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);}
+.field input{
+  width:100%;
+  border:1px solid var(--line);
+  background:#fff;
+  color:var(--ink);
+  padding:.55rem .6rem;
+  font-size:13px;
+  outline:none;
+}
+.field input:focus{border-color:var(--nasa-red);}
+.field input::placeholder{color:#9a978d;}
+.add-btn{
+  width:100%;
+  border:1px solid var(--line);
+  background:var(--ink);
+  color:#fff;
+  padding:.62rem .7rem;
+  font-size:11px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  font-weight:700;
+  cursor:pointer;
+}
+.add-btn:hover:not(:disabled){background:var(--nasa-red);border-color:var(--nasa-red);}
+.add-btn:disabled{opacity:.35;cursor:default;}
+.ooo-tog-btn{
+  width:100%;
+  background:var(--panel);
+  border:none;
+  border-bottom:1px solid var(--line-soft);
+  padding:.8rem .9rem;
+  text-align:left;
+  font-size:12px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  font-weight:700;
+  color:var(--ink);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  cursor:pointer;
+}
+.ooo-tog-btn:hover{background:var(--panel-alt);}
+.ooo-inner{padding:.75rem .8rem .85rem;}
+.cal-nav-row{display:flex;justify-content:space-between;align-items:center;padding-bottom:.45rem;}
+.cal-nav{background:none;border:none;color:var(--ink);font-size:22px;cursor:pointer;line-height:1;padding:0 .2rem;}
+.cal-month-lbl{font-size:14px;font-weight:700;}
+.cal-hint{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.45rem;}
+.cal-dow-row{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px;}
+.cal-dow-row span{text-align:center;font-size:10px;color:var(--muted);}
+.cal-dow-row span.wknd{color:#aaa79c;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+.cal-cell{text-align:center;font-size:11px;padding:.36rem .12rem;border:1px solid transparent;color:#aaa79c;min-height:31px;display:flex;align-items:center;justify-content:center;}
+.cal-cell.wt{cursor:pointer;color:var(--ink);}
+.cal-cell.wt:hover{background:var(--panel-alt);border-color:var(--line-soft);}
+.cal-cell.is-ooo{background:#f6e7e5;color:var(--nasa-red);border-color:#e6b8b3;cursor:pointer;}
+.cal-cell.is-booked{background:#ecebe6;color:var(--ink);border-color:var(--line-soft);}
+.cal-cell.is-today-cell{border-color:var(--line);font-weight:700;}
+.cal-legend{display:flex;gap:12px;margin-top:.6rem;font-size:10px;color:var(--muted);}
+.leg-dot{display:inline-block;width:8px;height:8px;margin-right:3px;vertical-align:middle;border:1px solid var(--line-soft);}
+.ooo-footer{display:flex;justify-content:space-between;align-items:center;margin-top:.55rem;font-size:10px;color:var(--muted);}
+.clr-btn{background:none;border:none;color:var(--muted);font-size:10px;cursor:pointer;}
+.clr-btn:hover{color:var(--nasa-red);}
+.footer-note{
+  max-width:1280px;
+  margin:0 auto 1.4rem;
+  padding:0 1.25rem;
+  font-size:11px;
+  color:var(--muted);
+}
+@media(max-width:1050px){
+  .topbar-inner{flex-direction:column;align-items:flex-start;}
+  .topbar-stats{min-width:0;width:100%;grid-template-columns:repeat(2,minmax(0,1fr));}
+  .wrap{grid-template-columns:1fr;}
+}
+@media(max-width:720px){
+  .topbar{padding:1rem;}
+  .topbar-brand{flex-direction:column;align-items:flex-start;gap:.75rem;}
+  .worm{width:150px;}
+  .topbar-title{font-size:22px;}
+  .wrap{padding:1rem;}
+  .srow{grid-template-columns:1fr;}
+  .srow-date,.srow-matter,.srow-sess{border-right:none;border-bottom:1px solid var(--line-soft);}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-brand">
+      <img class="worm" alt="NASA worm logotype" src="data:image/png;base64,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">
+      <div class="brand-copy">
+        <span class="topbar-title">Application Schedule</span>
+      </div>
+    </div>
+    <div class="topbar-stats">
+      <div class="tstat"><span class="tstat-l">Date</span><span id="hdr-date" class="tstat-v mono" style="font-size:13px"></span></div>
+      <div class="tstat"><span class="tstat-l">Applications</span><span id="hdr-apps" class="tstat-v">0</span></div>
+      <div class="tstat"><span class="tstat-l">Sessions Left</span><span id="hdr-left" class="tstat-v">0</span></div>
+      <div class="tstat"><span class="tstat-l">At Risk</span><span id="hdr-oob" class="tstat-v">0</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="col-main">
+    <div id="conf-wrap"></div>
+    <div id="done-today-wrap"></div>
+    <div id="schedule"></div>
+  </div>
+  <div class="col-side">
+    <div>
+      <div class="sec-label" style="margin-top:0">Application List</div>
+      <div class="card" id="apps-card"></div>
+    </div>
+    <div class="add-card">
+      <div class="add-title">Register Application</div>
+      <div class="field"><label>Matter Number</label><input type="text" id="inp-m" class="mono" placeholder="1234-123" maxlength="24" oninput="renderAll()" onkeydown="if(event.key==='Enter')addApp()"></div>
+      <div class="field"><label>Call Day</label><input type="date" id="inp-c" oninput="renderAll()"></div>
+      <div class="field"><label>Deadline</label><input type="date" id="inp-d" oninput="renderAll()"></div>
+      <button class="add-btn" id="add-btn" onclick="addApp()" disabled>Add to Manifest</button>
+    </div>
+    <div class="card">
+      <button class="ooo-tog-btn" onclick="toggleOoo()">
+        Calendar
+        <span id="ooo-tog-lbl" style="font-size:10px;color:var(--muted);font-family:'Courier New',monospace">▼ show</span>
+      </button>
+      <div id="ooo-body" style="display:none">
+        <div class="ooo-inner">
+          <div class="cal-nav-row">
+            <button class="cal-nav" onclick="prevMo()">&#8249;</button>
+            <span id="cal-lbl" class="cal-month-lbl"></span>
+            <button class="cal-nav" onclick="nextMo()">&#8250;</button>
+          </div>
+          <div class="cal-hint">Click Mon–Thu to toggle OOO</div>
+          <div class="cal-dow-row">
+            <span>M</span><span>T</span><span>W</span><span>T</span>
+            <span class="wknd">F</span><span class="wknd">S</span><span class="wknd">S</span>
+          </div>
+          <div id="cal-grid" class="cal-grid"></div>
+          <div class="cal-legend">
+            <span><span class="leg-dot" style="background:#ecebe6"></span>Scheduled</span>
+            <span><span class="leg-dot" style="background:#f6e7e5;border-color:#e6b8b3"></span>OOO</span>
+          </div>
+          <div class="ooo-footer">
+            <span id="ooo-ct"></span>
+            <button id="clr-ooo-btn" class="clr-btn" onclick="clrOoo()" style="display:none">Clear all</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Constants ─────────────────────────────────────────────── */
+const SESSIONS=['Claims','Drawings','Write','First Edit','Second Edit','Proof'];
+const SESS_S  =['Clms','Draw','Write','1st Ed','2nd Ed','Proof'];
+const S_CLR   =['#111111','#111111','#111111','#111111','#111111','#111111'];
+const S_BG    =['#f7f7f4','#f3f2ed','#efeee8','#f2efea','#f5efec','#eef0e8'];
+
+/* ── Utils ──────────────────────────────────────────────────── */
+const pad=n=>String(n).padStart(2,'0');
+const toStr=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const fromStr=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
+const TODAY=toStr(new Date());
+const isWT=s=>{const dw=fromStr(s).getDay();return dw>=1&&dw<=4;};
+const nextDay=s=>{const d=fromStr(s);d.setDate(d.getDate()+1);return toStr(d);};
+const daysBetween=(a,b)=>Math.round((fromStr(b)-fromStr(a))/86400000);
+const fmtRow=s=>fromStr(s).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+const fmtShort=s=>fromStr(s).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+
+/* ── State ──────────────────────────────────────────────────── */
+let apps=JSON.parse(localStorage.getItem('pw4_apps')||'[]');
+let clog=JSON.parse(localStorage.getItem('pw4_clog')||'{}');
+// clog[appId] = array of {sessIdx, date} objects
+let ooo=new Set(JSON.parse(localStorage.getItem('pw4_ooo')||'[]'));
+let _id=parseInt(localStorage.getItem('pw4_id')||'0');
+let calMo={y:new Date().getFullYear(),m:new Date().getMonth()};
+let oooOpen=false;
+
+const uid=()=>{_id++;localStorage.setItem('pw4_id',String(_id));return `a${_id}`;};
+const save=()=>{
+  localStorage.setItem('pw4_apps',JSON.stringify(apps));
+  localStorage.setItem('pw4_clog',JSON.stringify(clog));
+  localStorage.setItem('pw4_ooo',JSON.stringify([...ooo]));
+};
+
+/* ── Helpers ──────────────────────────────────────────────── */
+const doneCt=id=>(clog[id]||[]).length;
+const doneSet=id=>new Set((clog[id]||[]).map(e=>e.sessIdx));
+const nextPending=id=>{
+  const s=doneSet(id);
+  for(let i=0;i<SESSIONS.length;i++)if(!s.has(i))return i;
+  return SESSIONS.length;
+};
+const todayEntries=()=>{
+  const out=[];
+  for(const a of apps){
+    (clog[a.id]||[]).forEach(e=>{if(e.date===TODAY)out.push({app:a,entry:e});});
+  }
+  return out;
+};
+
+/* ── Scheduler ─────────────────────────────────────────────── */
+function buildSchedule(startFrom){
+  const queue=apps.map(a=>{
+    const s=doneSet(a.id);
+    const rem=[];
+    for(let i=0;i<SESSIONS.length;i++)if(!s.has(i))rem.push({name:SESSIONS[i],idx:i});
+    return{...a,nextIdx:rem.length?rem[0].idx:SESSIONS.length,rem};
+  }).filter(q=>q.rem.length>0);
+
+  const sched=[];
+  let cur=startFrom,g=0;
+  while(queue.some(q=>q.rem.length>0)&&g++<900){
+    if(!isWT(cur)||ooo.has(cur)){cur=nextDay(cur);continue;}
+    const elig=queue
+      .filter(q=>q.rem.length>0&&q.callDay<cur)
+      .sort((a,b)=>a.deadline.localeCompare(b.deadline));
+    if(elig.length>0){
+      const top=elig[0],sess=top.rem.shift();
+      sched.push({date:cur,appId:top.id,matter:top.matter,session:sess.name,sessIdx:sess.idx,deadline:top.deadline,onTime:cur<=top.deadline,isNext:sess.idx===top.nextIdx});
+    }
+    cur=nextDay(cur);
+  }
+  return sched;
+}
+
+/* ── Actions ────────────────────────────────────────────────── */
+function markDone(appId,sessIdx){
+  if(sessIdx===undefined)sessIdx=nextPending(appId);
+  if(sessIdx<0||sessIdx>=SESSIONS.length)return;
+  if(!clog[appId])clog[appId]=[];
+  if(clog[appId].some(e=>e.sessIdx===sessIdx))return;
+  clog[appId].push({sessIdx,date:TODAY});
+  save();renderAll();
+}
+
+function undoEntry(appId,sessIdx){
+  clog[appId]=(clog[appId]||[]).filter(e=>!(e.sessIdx===sessIdx&&e.date===TODAY));
+  save();renderAll();
+}
+
+function reopenSess(appId,sessIdx){
+  const app=apps.find(a=>a.id===appId);
+  if(!confirm(`Reopen "${SESSIONS[sessIdx]}" for ${app?.matter}?`))return;
+  clog[appId]=(clog[appId]||[]).filter(e=>e.sessIdx!==sessIdx);
+  save();renderAll();
+}
+
+function addApp(){
+  const m=document.getElementById('inp-m').value.trim();
+  const c=document.getElementById('inp-c').value;
+  const d=document.getElementById('inp-d').value;
+  if(!m||!c||!d)return;
+  if(d<=c){alert('Deadline must be after call day.');return;}
+  if(apps.find(a=>a.matter===m)&&!confirm(`Matter ${m} already exists. Add anyway?`))return;
+  apps.push({id:uid(),matter:m,callDay:c,deadline:d});
+  document.getElementById('inp-m').value='';
+  document.getElementById('inp-c').value='';
+  document.getElementById('inp-d').value='';
+  save();renderAll();
+}
+
+function removeApp(id){
+  if(!confirm('Remove this application and its completion history?'))return;
+  apps=apps.filter(a=>a.id!==id);delete clog[id];save();renderAll();
+}
+
+function toggleOoo(){
+  oooOpen=!oooOpen;
+  document.getElementById('ooo-body').style.display=oooOpen?'block':'none';
+  document.getElementById('ooo-tog-lbl').textContent=oooOpen?'▲ hide':'▼ show';
+  if(oooOpen)renderAll();
+}
+function prevMo(){const d=new Date(calMo.y,calMo.m-1);calMo={y:d.getFullYear(),m:d.getMonth()};renderAll();}
+function nextMo(){const d=new Date(calMo.y,calMo.m+1);calMo={y:d.getFullYear(),m:d.getMonth()};renderAll();}
+function togOoo(ds){ooo.has(ds)?ooo.delete(ds):ooo.add(ds);save();renderAll();}
+function clrOoo(){ooo=new Set();save();renderAll();}
+
+/* ── Render ─────────────────────────────────────────────────── */
+function renderAll(){
+  const todayList=todayEntries();
+  const sched=buildSchedule(TODAY);
+  const bookedDates=new Set(sched.map(s=>s.date));
+  const conflicts=sched.filter(s=>!s.onTime);
+  const conflictMatters=[...new Set(conflicts.map(c=>c.matter))];
+  const totalDone=apps.reduce((s,a)=>s+doneCt(a.id),0);
+  const totalLeft=apps.length*SESSIONS.length-totalDone;
+
+  document.getElementById('hdr-date').textContent=fmtRow(TODAY);
+  document.getElementById('hdr-apps').textContent=apps.length;
+  document.getElementById('hdr-left').textContent=totalLeft;
+  const oobEl=document.getElementById('hdr-oob');
+  oobEl.textContent=conflictMatters.length;
+  oobEl.className='tstat-v'+(conflictMatters.length>0?' alarm':'');
+
+  let confHTML='';
+  if(conflictMatters.length>0){
+    const byM={};
+    conflicts.forEach(c=>{if(!byM[c.matter])byM[c.matter]={matter:c.matter,deadline:c.deadline,sessions:[]};byM[c.matter].sessions.push(c.session);});
+    confHTML='<div class="conf"><div class="conf-hdr">&#9888; Deadline risk — '+conflictMatters.length+' application'+(conflictMatters.length!==1?'s are':' is')+' outside the available window</div>'+
+      Object.values(byM).map(x=>'<div class="conf-item"><span class="conf-mn">'+x.matter+'</span> — '+x.sessions.length+' session'+(x.sessions.length!==1?'s':'')+' fall beyond <strong>'+fmtShort(x.deadline)+'</strong>: '+x.sessions.join(', ')+'.</div>').join('')+
+      '</div>';
+  }
+  document.getElementById('conf-wrap').innerHTML=confHTML;
+
+  let dtHTML='';
+  if(todayList.length){
+    dtHTML='<div class="done-today-bar">'+todayList.map(te=>
+      '<div class="done-today-item"><span>Completed <strong>'+te.app.matter+'</strong> — '+SESSIONS[te.entry.sessIdx]+'</span>'+
+      "<button class=\"undo-btn\" onclick=\"undoEntry('"+te.app.id+"',"+te.entry.sessIdx+")\">Undo</button></div>"
+    ).join('')+'</div>';
+  }
+  document.getElementById('done-today-wrap').innerHTML=dtHTML;
+
+  if(!apps.length){
+    document.getElementById('schedule').innerHTML='<div class="empty-state">Register an application to generate the schedule.</div>';
+    renderSide(totalDone,bookedDates);
+    return;
+  }
+
+  const pastRows=[];
+  for(const app of apps){
+    (clog[app.id]||[]).forEach(e=>{
+      pastRows.push({date:e.date,appId:app.id,matter:app.matter,session:SESSIONS[e.sessIdx],sessIdx:e.sessIdx,deadline:app.deadline,done:true});
+    });
+  }
+  pastRows.sort((a,b)=>a.date!==b.date?a.date.localeCompare(b.date):a.sessIdx-b.sessIdx);
+  const recentPast=pastRows.slice(-8);
+  const futureRows=sched.slice(0,36);
+
+  let html='';
+  if(recentPast.length>0){
+    html+='<div class="sec-label">Recent completions</div>';
+    recentPast.forEach(row=>{
+      const si=row.sessIdx;
+      html+="<div class=\"srow done-row\" onclick=\"reopenSess('"+row.appId+"',"+si+")\" title=\"Click to reopen this session\">"+
+        '<div class="srow-date"><div class="srow-date-main">'+fmtRow(row.date)+'</div></div>'+
+        '<div class="srow-matter">'+row.matter+'</div>'+
+        '<div class="srow-sess"><span class="sess-badge" style="background:'+S_BG[si]+';color:'+S_CLR[si]+'">'+row.session+'</span>'+
+        '<span class="srow-spacer"></span>'+
+        '<span class="srow-hint reopen-hint">↺ reopen</span></div>'+
+        '<div class="chk-wrap"><div class="chk checked"></div></div>'+
+        '</div>';
+    });
+  }
+
+  html+='<div class="sec-label">'+(recentPast.length?'Upcoming sessions':'Sessions')+'</div>';
+
+  if(futureRows.length===0){
+    html+='<div class="empty-state" style="margin-top:4px">All sessions complete.</div>';
+  } else {
+    futureRows.forEach(row=>{
+      const si=row.sessIdx;
+      const isToday=row.date===TODAY;
+      const isPast=row.date<TODAY;
+      const isNext=row.isNext;
+      let chkCls='chk';
+      let chkClick='';
+      let chkTitle='';
+      if(isNext){
+        chkClick="onclick=\"markDone('"+row.appId+"',"+row.sessIdx+")\"";
+        chkTitle='title="Mark complete"';
+      } else if(isPast){
+        chkCls='chk missed';
+        chkTitle='title="Earlier scheduled session for this matter still pending"';
+      } else {
+        chkCls='chk disabled';
+        chkTitle='title="Mark out of order from the Applications list if needed"';
+      }
+
+      const dLeft=daysBetween(TODAY,row.deadline);
+      const dlCls=!row.onTime?'over':dLeft<=5?'tight':'';
+      const dlText=!row.onTime?fmtShort(row.deadline)+' &#9888;':'due '+fmtShort(row.deadline);
+      const hintText=isNext?'<span class="srow-hint">mark done</span>':'';
+      const rowCls='srow'+(isToday?' today-row':isPast?' past-row':'')+(row.onTime?'':' late-row');
+      html+='<div class="'+rowCls+'">'+
+        '<div class="srow-date">'+
+        '<div class="srow-date-main'+(isToday?' ist':'')+'">'+fmtRow(row.date)+'</div>'+
+        (isToday?'<div class="today-chip">Today</div>':'')+
+        '</div>'+
+        '<div class="srow-matter">'+row.matter+'</div>'+
+        '<div class="srow-sess">'+
+        '<span class="sess-badge" style="background:'+S_BG[si]+';color:'+S_CLR[si]+'">'+row.session+'</span>'+
+        '<span class="srow-spacer"></span>'+
+        hintText+
+        '<span class="srow-dl '+dlCls+'">'+dlText+'</span>'+
+        '</div>'+
+        '<div class="chk-wrap"><div class="'+chkCls+'" '+chkClick+' '+chkTitle+'></div></div>'+
+        '</div>';
+    });
+    if(sched.length>36)html+='<div style="text-align:center;padding:12px 0;font-size:11px;color:var(--muted)">… and '+(sched.length-36)+' more session'+(sched.length-36!==1?'s':'')+' beyond this window</div>';
+  }
+
+  document.getElementById('schedule').innerHTML=html;
+  renderSide(totalDone,bookedDates);
+}
+
+function renderSide(totalDone,bookedDates){
+  let appsHTML='';
+  if(!apps.length){
+    appsHTML='<div class="apps-empty">No applications yet.</div>';
+  } else {
+    appsHTML='<div class="card-hdr"><div class="card-title">Manifest</div><div class="card-title">'+apps.length+' item'+(apps.length!==1?'s':'')+'</div></div>'+ [...apps].sort((a,b)=>a.deadline.localeCompare(b.deadline)).map(a=>{
+      const done=doneCt(a.id),isComplete=done>=SESSIONS.length;
+      const doneS=doneSet(a.id);
+      const nextP=nextPending(a.id);
+      const dLeft=daysBetween(TODAY,a.deadline);
+      const dlStr=isComplete?'Complete':dLeft>=0?dLeft+'d to deadline':Math.abs(dLeft)+'d overdue';
+      const dlC=isComplete?'var(--green)':dLeft<0?'var(--red)':dLeft<=5?'var(--amber)':'var(--muted)';
+      const progHTML=SESSIONS.map((_,i)=>{
+        const isDone=doneS.has(i);
+        const isCur=!isDone&&i===nextP;
+        const stateCls=(isDone?' done':isCur?' cur':'');
+        let click,title;
+        if(isDone){
+          click=" onclick=\"reopenSess('"+a.id+"',"+i+")\"";
+          title=' title="Reopen '+SESSIONS[i]+'"';
+        } else {
+          click=" onclick=\"markDone('"+a.id+"',"+i+")\"";
+          title=' title="Mark '+SESSIONS[i]+' complete"';
+        }
+        return '<div class="prog-col clickable'+stateCls+'"'+click+title+'>'+
+          '<div class="prog-col-bar'+stateCls+'"></div>'+
+          '<div class="prog-col-name'+stateCls+'">'+SESS_S[i]+'</div>'+
+          '</div>';
+      }).join('');
+      return '<div class="app-item">'+
+        "<div class=\"app-top\"><div class=\"app-mn\">"+a.matter+"</div><button class=\"app-rm\" onclick=\"removeApp('"+a.id+"')\">&times;</button></div>"+
+        '<div class="app-meta">Call: '+fmtShort(a.callDay)+' &middot; Deadline: '+fmtShort(a.deadline)+'<br><span style="color:'+dlC+'">'+dlStr+'</span></div>'+
+        '<div class="prog-cols">'+progHTML+'</div>'+
+        '</div>';
+    }).join('');
+  }
+  document.getElementById('apps-card').innerHTML=appsHTML;
+
+  const m=document.getElementById('inp-m').value.trim();
+  const c=document.getElementById('inp-c').value;
+  const d=document.getElementById('inp-d').value;
+  document.getElementById('add-btn').disabled=!(m&&c&&d);
+
+  const togLbl=document.getElementById('ooo-tog-lbl');
+  togLbl.textContent=oooOpen?'▲ hide':(ooo.size?'▼ '+ooo.size+' blocked':'▼ show');
+
+  if(!oooOpen)return;
+  const cd=new Date(calMo.y,calMo.m,1);
+  document.getElementById('cal-lbl').textContent=cd.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const fw=cd.getDay(),off=fw===0?6:fw-1,dim=new Date(calMo.y,calMo.m+1,0).getDate();
+  const cells=[...Array(off).fill(null),...Array.from({length:dim},(_,k)=>k+1)];
+  document.getElementById('cal-grid').innerHTML=cells.map((day,i)=>{
+    if(!day)return'<div></div>';
+    const col=i%7,ds=toStr(new Date(calMo.y,calMo.m,day));
+    const wt=col<4,iO=ooo.has(ds),iT=ds===TODAY,iB=bookedDates.has(ds)&&!iO;
+    const cls=['cal-cell'];
+    if(col>=4)cls.push('');
+    else if(iO)cls.push('is-ooo');
+    else if(iB)cls.push('is-booked');
+    else if(wt)cls.push('wt');
+    if(iT)cls.push('is-today-cell');
+    return'<div class="'+cls.filter(Boolean).join(' ')+'" '+(wt?"onclick=\"togOoo('"+ds+"')\"":'')+'>'+day+'</div>';
+  }).join('');
+  document.getElementById('ooo-ct').textContent=ooo.size?ooo.size+' day'+(ooo.size!==1?'s':'')+' blocked':'No OOO days set';
+  document.getElementById('clr-ooo-btn').style.display=ooo.size?'':'none';
+}
+
+renderAll();
+</script>
+</body>
+</html>
