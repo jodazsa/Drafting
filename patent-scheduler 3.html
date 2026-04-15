@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Patent Workflow Scheduler</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --ink:#1a1814;
+  --paper:#f5f2ec;
+  --surface:#ffffff;
+  --rule:rgba(0,0,0,0.08);
+  --rule2:rgba(0,0,0,0.16);
+  --muted:#7a7870;
+  --hint:#b0ae9a;
+  --navy:#1c2d42;
+  --blue:#2358a0;
+  --green:#1f5c38;
+  --amber:#8a5100;
+  --red:#8f1f1f;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;}
+.mono{font-family:'Courier New',Courier,monospace;}
+
+/* ── Top bar ── */
+.topbar{
+  background:var(--navy);color:#c8d4e0;
+  padding:0 1.5rem;height:52px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:20;
+}
+.topbar-brand{display:flex;flex-direction:column;justify-content:center;}
+.topbar-eyebrow{font-size:8px;letter-spacing:4px;text-transform:uppercase;opacity:.4;line-height:1;}
+.topbar-title{font-size:14px;font-weight:600;letter-spacing:.01em;line-height:1;margin-top:3px;}
+.topbar-stats{display:flex;gap:2rem;align-items:center;}
+.tstat{text-align:right;}
+.tstat-l{font-size:8px;letter-spacing:2px;text-transform:uppercase;opacity:.4;display:block;line-height:1;}
+.tstat-v{font-size:15px;font-weight:700;line-height:1;margin-top:2px;display:block;}
+.tstat-v.alarm{color:#f08080;}
+
+/* ── Layout ── */
+.wrap{max-width:1100px;margin:0 auto;padding:1.25rem 1.25rem 4rem;display:flex;gap:1.25rem;align-items:flex-start;}
+.col-main{flex:1 1 0;min-width:0;}
+.col-side{width:295px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;}
+
+/* ── Section labels ── */
+.sec-label{font-size:8px;letter-spacing:3px;text-transform:uppercase;color:var(--hint);font-weight:700;padding:0 2px;margin:1.1rem 0 6px;}
+.sec-label:first-child{margin-top:0;}
+
+/* ── Schedule rows ── */
+.srow{
+  display:flex;align-items:center;gap:0;
+  background:var(--surface);
+  border:0.5px solid var(--rule);
+  border-radius:9px;
+  margin-bottom:4px;
+  overflow:hidden;
+  transition:border-color .15s;
+}
+.srow.today-row{border-color:var(--blue);border-width:1px;}
+.srow.past-row{opacity:.5;}
+.srow.done-row{opacity:.45;}
+.srow.done-row:hover{opacity:.7;border-color:var(--rule2);cursor:pointer;}
+.srow.late-row{border-color:rgba(143,31,31,.25);background:#fdf6f6;}
+.srow-date{
+  min-width:108px;padding:11px 12px;
+  border-right:0.5px solid var(--rule);
+  flex-shrink:0;
+}
+.srow-date-main{font-size:11px;color:var(--muted);font-family:'Courier New',monospace;}
+.srow-date-main.ist{color:var(--blue);font-weight:700;}
+.today-chip{display:inline-block;font-size:8px;font-weight:700;letter-spacing:2px;background:var(--blue);color:#fff;padding:2px 5px;border-radius:3px;margin-top:3px;}
+.srow-matter{
+  min-width:82px;padding:11px 12px;
+  border-right:0.5px solid var(--rule);
+  flex-shrink:0;
+  font-family:'Courier New',monospace;font-size:12px;font-weight:700;color:var(--ink);
+}
+.srow-sess{padding:11px 14px;flex:1;display:flex;align-items:center;gap:10px;}
+.sess-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;letter-spacing:.02em;}
+.srow-spacer{flex:1;}
+.srow-dl{font-size:10px;color:var(--hint);font-family:'Courier New',monospace;white-space:nowrap;padding-right:4px;}
+.srow-dl.tight{color:var(--amber);}
+.srow-dl.over{color:var(--red);}
+.srow-hint{font-size:10px;color:var(--hint);font-family:'Courier New',monospace;white-space:nowrap;padding-right:6px;opacity:0;transition:opacity .15s;}
+.srow:hover .srow-hint{opacity:1;}
+.srow-hint.reopen-hint{color:#b07070;}
+
+/* ── Checkbox ── */
+.chk-wrap{padding:11px 14px;border-left:0.5px solid var(--rule);flex-shrink:0;}
+.chk{
+  width:26px;height:26px;border-radius:6px;
+  border:1.5px solid #ccc;background:#fff;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .15s;user-select:none;
+}
+.chk:hover{border-color:var(--blue);background:#eef4ff;}
+.chk.checked{background:var(--green);border-color:var(--green);}
+.chk.checked::after{content:'✓';color:#fff;font-size:14px;font-weight:800;}
+.chk.disabled{opacity:.22;cursor:not-allowed;border-color:#ccc;}
+.chk.disabled:hover{border-color:#ccc;background:#fff;}
+.chk.missed{border-color:var(--amber);}
+.chk.missed:hover{background:#fff9ee;border-color:var(--amber);}
+
+/* ── Conflict banner ── */
+.conf{background:#fdf1f1;border:0.5px solid rgba(143,31,31,.22);border-radius:10px;padding:12px 16px;margin-bottom:10px;}
+.conf-hdr{font-size:12px;font-weight:700;color:var(--red);margin-bottom:7px;}
+.conf-item{font-size:11px;color:#6b2020;line-height:1.7;}
+.conf-mn{font-family:'Courier New',monospace;font-weight:700;color:var(--ink);}
+
+/* ── Empty state ── */
+.empty-state{background:var(--surface);border:0.5px solid var(--rule);border-radius:10px;padding:40px 20px;text-align:center;color:var(--muted);font-size:13px;}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:0.5px solid var(--rule);border-radius:12px;overflow:hidden;}
+.card-hdr{padding:10px 14px;border-bottom:0.5px solid var(--rule);display:flex;justify-content:space-between;align-items:center;}
+.card-title{font-size:13px;font-weight:600;}
+
+/* ── App rows ── */
+.app-item{padding:10px 14px;border-bottom:0.5px solid var(--rule);}
+.app-item:last-child{border-bottom:none;}
+.app-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+.app-mn{font-family:'Courier New',monospace;font-size:13px;font-weight:700;}
+.app-rm{background:none;border:none;color:var(--hint);font-size:16px;cursor:pointer;line-height:1;padding:0 2px;}
+.app-rm:hover{color:var(--red);}
+.app-meta{font-size:10px;color:var(--muted);line-height:1.65;margin-bottom:6px;}
+.prog-bars{display:flex;gap:2px;margin-bottom:2px;}
+.prog-bar{flex:1;height:3px;border-radius:2px;background:#e8e5de;}
+.prog-bar.done{background:var(--green);}
+.prog-bar.cur{background:var(--amber);}
+.prog-names{display:flex;gap:2px;}
+.prog-name{flex:1;font-size:7.5px;text-align:center;color:var(--hint);text-transform:uppercase;letter-spacing:.3px;overflow:hidden;white-space:nowrap;}
+.prog-name.done{color:var(--green);}
+.prog-name.cur{color:var(--amber);}
+.apps-empty{padding:20px 14px;text-align:center;color:var(--muted);font-size:13px;}
+
+/* ── Add form ── */
+.add-card{background:var(--surface);border:0.5px solid var(--rule);border-radius:12px;padding:14px;}
+.add-title{font-size:13px;font-weight:600;margin-bottom:12px;}
+.field{margin-bottom:8px;}
+.field label{font-size:8px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px;}
+.field input{width:100%;background:#f9f8f5;border:0.5px solid var(--rule2);border-radius:6px;padding:7px 10px;font-size:13px;color:var(--ink);outline:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transition:border-color .15s;}
+.field input.mono{font-family:'Courier New',monospace;}
+.field input:focus{border-color:var(--blue);}
+.field input::placeholder{color:var(--hint);}
+.add-btn{width:100%;background:var(--navy);color:#c8d4e0;border:none;border-radius:7px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px;transition:opacity .15s;}
+.add-btn:hover:not(:disabled){opacity:.82;}
+.add-btn:disabled{opacity:.22;cursor:default;}
+
+/* ── OOO panel ── */
+.ooo-tog-btn{width:100%;padding:10px 14px;background:none;border:none;font-family:inherit;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;display:flex;justify-content:space-between;align-items:center;text-align:left;}
+.ooo-tog-btn:hover{background:#fafaf7;}
+.ooo-inner{padding:0 12px 12px;border-top:0.5px solid var(--rule);}
+.cal-nav-row{display:flex;justify-content:space-between;align-items:center;padding:10px 2px 8px;}
+.cal-nav{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1;padding:0 4px;}
+.cal-nav:hover{color:var(--ink);}
+.cal-month-lbl{font-size:13px;font-weight:500;}
+.cal-hint{font-size:9px;color:var(--hint);text-align:center;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;}
+.cal-dow-row{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px;}
+.cal-dow-row span{text-align:center;font-size:9px;font-family:'Courier New',monospace;color:var(--muted);}
+.cal-dow-row span.wknd{color:var(--hint);}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+.cal-cell{text-align:center;font-size:11px;font-family:'Courier New',monospace;padding:4px 2px;border-radius:4px;border:0.5px solid transparent;color:var(--hint);}
+.cal-cell.wt{cursor:pointer;color:var(--ink);}
+.cal-cell.wt:hover{background:#f0efe9;}
+.cal-cell.is-ooo{background:#fde8e8;color:var(--red);cursor:pointer;}
+.cal-cell.is-booked{background:#ddeeff;color:var(--blue);}
+.cal-cell.is-today-cell{border-color:var(--amber);font-weight:700;}
+.cal-legend{display:flex;gap:12px;margin-top:9px;font-size:10px;color:var(--muted);}
+.leg-dot{display:inline-block;width:8px;height:8px;border-radius:2px;vertical-align:middle;margin-right:3px;}
+.ooo-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:10px;color:var(--muted);font-family:'Courier New',monospace;}
+.clr-btn{background:none;border:none;color:var(--muted);font-size:10px;cursor:pointer;font-family:'Courier New',monospace;}
+.clr-btn:hover{color:var(--red);}
+
+/* ── Done-today banner ── */
+.done-today-bar{background:#edf7f0;border:0.5px solid rgba(31,92,56,.25);border-radius:9px;padding:10px 16px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--green);}
+.done-today-bar strong{font-family:'Courier New',monospace;}
+.undo-btn{background:none;border:0.5px solid rgba(31,92,56,.35);border-radius:5px;padding:3px 10px;font-size:11px;color:var(--green);cursor:pointer;font-family:inherit;}
+.undo-btn:hover{background:rgba(31,92,56,.06);}
+
+@media(max-width:740px){.wrap{flex-direction:column;}.col-side{width:100%;}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <span class="topbar-eyebrow">Patent Practice</span>
+    <span class="topbar-title">Workflow Scheduler</span>
+  </div>
+  <div class="topbar-stats">
+    <div class="tstat"><span class="tstat-l">Today</span><span id="hdr-date" class="tstat-v mono" style="font-size:12px"></span></div>
+    <div class="tstat"><span class="tstat-l">Apps</span><span id="hdr-apps" class="tstat-v">0</span></div>
+    <div class="tstat"><span class="tstat-l">Left</span><span id="hdr-left" class="tstat-v">0</span></div>
+    <div class="tstat"><span class="tstat-l">Overbooked</span><span id="hdr-oob" class="tstat-v">0</span></div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="col-main">
+    <div id="conf-wrap"></div>
+    <div id="done-today-wrap"></div>
+    <div id="schedule"></div>
+  </div>
+  <div class="col-side">
+    <div>
+      <div class="sec-label" style="margin-top:0">Applications</div>
+      <div class="card" id="apps-card"></div>
+    </div>
+    <div class="add-card">
+      <div class="add-title">Add Application</div>
+      <div class="field"><label>Matter Number</label><input type="text" id="inp-m" class="mono" placeholder="1234-123" maxlength="24" oninput="renderAll()" onkeydown="if(event.key==='Enter')addApp()"></div>
+      <div class="field"><label>Call Day</label><input type="date" id="inp-c" oninput="renderAll()"></div>
+      <div class="field"><label>Deadline</label><input type="date" id="inp-d" oninput="renderAll()"></div>
+      <button class="add-btn" id="add-btn" onclick="addApp()" disabled>Add to Queue</button>
+    </div>
+    <div class="card">
+      <button class="ooo-tog-btn" onclick="toggleOoo()">
+        Out-of-Office Days
+        <span id="ooo-tog-lbl" style="font-size:10px;color:var(--hint);font-family:'Courier New',monospace">▼ show</span>
+      </button>
+      <div id="ooo-body" style="display:none">
+        <div class="ooo-inner">
+          <div class="cal-nav-row">
+            <button class="cal-nav" onclick="prevMo()">&#8249;</button>
+            <span id="cal-lbl" class="cal-month-lbl"></span>
+            <button class="cal-nav" onclick="nextMo()">&#8250;</button>
+          </div>
+          <div class="cal-hint">Click Mon – Thu to toggle OOO</div>
+          <div class="cal-dow-row">
+            <span>M</span><span>T</span><span>W</span><span>T</span>
+            <span class="wknd">F</span><span class="wknd">S</span><span class="wknd">S</span>
+          </div>
+          <div id="cal-grid" class="cal-grid"></div>
+          <div class="cal-legend">
+            <span><span class="leg-dot" style="background:#ddeeff"></span>Scheduled</span>
+            <span><span class="leg-dot" style="background:#fde8e8"></span>OOO</span>
+          </div>
+          <div class="ooo-footer">
+            <span id="ooo-ct"></span>
+            <button id="clr-ooo-btn" class="clr-btn" onclick="clrOoo()" style="display:none">Clear all</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Constants ─────────────────────────────────────────────── */
+const SESSIONS=['Claims','Drawings','Write','First Edit','Second Edit','Proof'];
+const SESS_S  =['Clms','Draw','Write','1st Ed','2nd Ed','Proof'];
+const S_CLR   =['#174f9e','#4e2e9e','#145230','#7a4700','#822a12','#174f2a'];
+const S_BG    =['#ddeeff','#ede8ff','#d4f0e0','#fff0cc','#ffeada','#d8f5e2'];
+
+/* ── Utils ──────────────────────────────────────────────────── */
+const pad=n=>String(n).padStart(2,'0');
+const toStr=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const fromStr=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
+const TODAY=toStr(new Date());
+const isWT=s=>{const dw=fromStr(s).getDay();return dw>=1&&dw<=4;};
+const nextDay=s=>{const d=fromStr(s);d.setDate(d.getDate()+1);return toStr(d);};
+const daysBetween=(a,b)=>Math.round((fromStr(b)-fromStr(a))/86400000);
+const fmtRow=s=>fromStr(s).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+const fmtShort=s=>fromStr(s).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+
+/* ── State ──────────────────────────────────────────────────── */
+let apps=JSON.parse(localStorage.getItem('pw4_apps')||'[]');
+let clog=JSON.parse(localStorage.getItem('pw4_clog')||'{}');
+// clog[appId] = array of {sessIdx, date} objects
+let ooo=new Set(JSON.parse(localStorage.getItem('pw4_ooo')||'[]'));
+let _id=parseInt(localStorage.getItem('pw4_id')||'0');
+let calMo={y:new Date().getFullYear(),m:new Date().getMonth()};
+let oooOpen=false;
+
+const uid=()=>{_id++;localStorage.setItem('pw4_id',String(_id));return `a${_id}`;};
+const save=()=>{
+  localStorage.setItem('pw4_apps',JSON.stringify(apps));
+  localStorage.setItem('pw4_clog',JSON.stringify(clog));
+  localStorage.setItem('pw4_ooo',JSON.stringify([...ooo]));
+};
+
+/* ── Helpers ──────────────────────────────────────────────── */
+// How many sessions are done for an app
+const doneCt=id=>(clog[id]||[]).length;
+// Was any session completed today?
+const anyDoneToday=()=>apps.some(a=>(clog[a.id]||[]).some(e=>e.date===TODAY));
+// What was completed today?
+const todayEntry=()=>{
+  for(const a of apps){
+    const e=(clog[a.id]||[]).find(e=>e.date===TODAY);
+    if(e)return{app:a,entry:e};
+  }
+  return null;
+};
+
+/* ── Scheduler ─────────────────────────────────────────────── */
+function buildSchedule(startFrom){
+  // Build per-app "next session index" from clog
+  const nextSess={};
+  apps.forEach(a=>{nextSess[a.id]=doneCt(a.id);});
+
+  const queue=apps
+    .filter(a=>nextSess[a.id]<SESSIONS.length)
+    .map(a=>({...a,nextIdx:nextSess[a.id],rem:SESSIONS.slice(nextSess[a.id]).map((name,i)=>({name,idx:nextSess[a.id]+i}))}));
+
+  const sched=[];
+  let cur=startFrom,g=0;
+  while(queue.some(q=>q.rem.length>0)&&g++<900){
+    if(!isWT(cur)||ooo.has(cur)){cur=nextDay(cur);continue;}
+    const elig=queue
+      .filter(q=>q.rem.length>0&&q.callDay<cur)
+      .sort((a,b)=>a.deadline.localeCompare(b.deadline));
+    if(elig.length>0){
+      const top=elig[0],sess=top.rem.shift();
+      sched.push({date:cur,appId:top.id,matter:top.matter,session:sess.name,sessIdx:sess.idx,deadline:top.deadline,onTime:cur<=top.deadline,isNext:sess.idx===top.nextIdx});
+    }
+    cur=nextDay(cur);
+  }
+  return sched;
+}
+
+/* ── Actions ────────────────────────────────────────────────── */
+function markDone(appId){
+  const done=doneCt(appId);
+  if(done>=SESSIONS.length)return;
+  if(!clog[appId])clog[appId]=[];
+  clog[appId].push({sessIdx:done,date:TODAY});
+  save();renderAll();
+}
+
+function undoToday(){
+  const te=todayEntry();
+  if(!te)return;
+  clog[te.app.id]=(clog[te.app.id]||[]).filter(e=>e.date!==TODAY);
+  save();renderAll();
+}
+
+function reopenSess(appId,sessIdx){
+  const app=apps.find(a=>a.id===appId);
+  const totalDone=doneCt(appId);
+  const later=totalDone-(sessIdx+1);
+  const msg=later>0
+    ?`Reopen "${SESSIONS[sessIdx]}" for ${app?.matter}?\n\nThis will also undo the ${later} later session${later!==1?'s':''}.`
+    :`Reopen "${SESSIONS[sessIdx]}" for ${app?.matter}?`;
+  if(!confirm(msg))return;
+  // Remove this session and all after it
+  clog[appId]=(clog[appId]||[]).filter(e=>e.sessIdx<sessIdx);
+  save();renderAll();
+}
+
+function addApp(){
+  const m=document.getElementById('inp-m').value.trim();
+  const c=document.getElementById('inp-c').value;
+  const d=document.getElementById('inp-d').value;
+  if(!m||!c||!d)return;
+  if(d<=c){alert('Deadline must be after call day.');return;}
+  if(apps.find(a=>a.matter===m)&&!confirm(`Matter ${m} already exists. Add anyway?`))return;
+  apps.push({id:uid(),matter:m,callDay:c,deadline:d});
+  document.getElementById('inp-m').value='';
+  document.getElementById('inp-c').value='';
+  document.getElementById('inp-d').value='';
+  save();renderAll();
+}
+
+function removeApp(id){
+  if(!confirm('Remove this application and its completion history?'))return;
+  apps=apps.filter(a=>a.id!==id);delete clog[id];save();renderAll();
+}
+
+function toggleOoo(){
+  oooOpen=!oooOpen;
+  document.getElementById('ooo-body').style.display=oooOpen?'block':'none';
+  document.getElementById('ooo-tog-lbl').textContent=oooOpen?'▲ hide':'▼ show';
+  if(oooOpen)renderAll();
+}
+function prevMo(){const d=new Date(calMo.y,calMo.m-1);calMo={y:d.getFullYear(),m:d.getMonth()};renderAll();}
+function nextMo(){const d=new Date(calMo.y,calMo.m+1);calMo={y:d.getFullYear(),m:d.getMonth()};renderAll();}
+function togOoo(ds){ooo.has(ds)?ooo.delete(ds):ooo.add(ds);save();renderAll();}
+function clrOoo(){ooo=new Set();save();renderAll();}
+
+/* ── Render ─────────────────────────────────────────────────── */
+function renderAll(){
+  const doneToday=anyDoneToday();
+  const te=todayEntry();
+  // Forward schedule starts from today; if something done today, still show from today
+  // but checkboxes for other apps will be disabled
+  const sched=buildSchedule(TODAY);
+  const bookedDates=new Set(sched.map(s=>s.date));
+  const conflicts=sched.filter(s=>!s.onTime);
+  const conflictMatters=[...new Set(conflicts.map(c=>c.matter))];
+  const totalDone=apps.reduce((s,a)=>s+doneCt(a.id),0);
+  const totalLeft=apps.length*SESSIONS.length-totalDone;
+
+  /* Header */
+  document.getElementById('hdr-date').textContent=fmtRow(TODAY);
+  document.getElementById('hdr-apps').textContent=apps.length;
+  document.getElementById('hdr-left').textContent=totalLeft;
+  const oobEl=document.getElementById('hdr-oob');
+  oobEl.textContent=conflictMatters.length;
+  oobEl.className='tstat-v'+(conflictMatters.length>0?' alarm':'');
+
+  /* Conflict banner */
+  let confHTML='';
+  if(conflictMatters.length>0){
+    const byM={};
+    conflicts.forEach(c=>{if(!byM[c.matter])byM[c.matter]={matter:c.matter,deadline:c.deadline,sessions:[]};byM[c.matter].sessions.push(c.session);});
+    confHTML='<div class="conf"><div class="conf-hdr">&#9888; Overbooked &mdash; '+conflictMatters.length+' application'+(conflictMatters.length!==1?'s cannot':'  cannot')+' meet their deadline</div>'+
+      Object.values(byM).map(x=>'<div class="conf-item"><span class="conf-mn">'+x.matter+'</span> &mdash; '+x.sessions.length+' session'+(x.sessions.length!==1?'s':'')+' fall past deadline of <strong>'+fmtShort(x.deadline)+'</strong>: '+x.sessions.join(', ')+'.</div>').join('')+
+      '</div>';
+  }
+  document.getElementById('conf-wrap').innerHTML=confHTML;
+
+  /* Done-today bar */
+  let dtHTML='';
+  if(te){
+    dtHTML='<div class="done-today-bar"><span>&#10003; <strong>'+te.app.matter+'</strong> &mdash; '+SESSIONS[te.entry.sessIdx]+' completed today</span><button class="undo-btn" onclick="undoToday()">Undo</button></div>';
+  }
+  document.getElementById('done-today-wrap').innerHTML=dtHTML;
+
+  /* ── Schedule ── */
+  if(!apps.length){
+    document.getElementById('schedule').innerHTML='<div class="empty-state">Add an application to get started.</div>';
+    renderSide(totalDone,bookedDates);
+    return;
+  }
+
+  // Collect past completions (sorted by date then sessIdx)
+  const pastRows=[];
+  for(const app of apps){
+    (clog[app.id]||[]).forEach(e=>{
+      pastRows.push({date:e.date,appId:app.id,matter:app.matter,session:SESSIONS[e.sessIdx],sessIdx:e.sessIdx,deadline:app.deadline,done:true});
+    });
+  }
+  pastRows.sort((a,b)=>a.date!==b.date?a.date.localeCompare(b.date):a.sessIdx-b.sessIdx);
+  const recentPast=pastRows.slice(-8);
+
+  // Future rows: cap at 36
+  const futureRows=sched.slice(0,36);
+
+  // Build HTML
+  let html='';
+
+  // Past section
+  if(recentPast.length>0){
+    html+='<div class="sec-label">Recent completions</div>';
+    recentPast.forEach(row=>{
+      const si=row.sessIdx;
+      html+='<div class="srow done-row" onclick="reopenSess(\''+row.appId+'\','+si+')" title="Click to reopen this session">'+
+        '<div class="srow-date"><div class="srow-date-main">'+fmtRow(row.date)+'</div></div>'+
+        '<div class="srow-matter">'+row.matter+'</div>'+
+        '<div class="srow-sess"><span class="sess-badge" style="background:'+S_BG[si]+';color:'+S_CLR[si]+'">'+row.session+'</span>'+
+        '<span class="srow-spacer"></span>'+
+        '<span class="srow-hint reopen-hint">&#8635; reopen</span></div>'+
+        '<div class="chk-wrap"><div class="chk checked"></div></div>'+
+        '</div>';
+    });
+  }
+
+  // Upcoming section
+  html+='<div class="sec-label">'+(recentPast.length?'Upcoming sessions':'Sessions')+'</div>';
+
+  if(futureRows.length===0){
+    html+='<div class="empty-state" style="margin-top:4px">All sessions complete &mdash; great work.</div>';
+  } else {
+    futureRows.forEach(row=>{
+      const si=row.sessIdx;
+      const isToday=row.date===TODAY;
+      const isPast=row.date<TODAY;
+
+      // Determine checkbox state
+      // A session is checkable if it's the "next" for its app AND no other session was done today
+      // (or the done-today session IS this one — but that's handled by pastRows)
+      const isNext=row.isNext;
+      let chkCls='chk';
+      let chkClick='';
+      let chkTitle='';
+      if(isNext&&!doneToday){
+        chkClick='onclick="markDone(\''+row.appId+'\')"';
+        chkTitle='title="Mark complete"';
+      } else if(isNext&&doneToday){
+        chkCls='chk disabled';
+        chkTitle='title="Already completed a session today"';
+      } else if(isPast){
+        chkCls='chk missed';
+        chkTitle='title="Complete earlier sessions for this matter first"';
+      } else {
+        chkCls='chk disabled';
+        chkTitle='title="Complete earlier sessions for this matter first"';
+      }
+
+      const dLeft=daysBetween(TODAY,row.deadline);
+      const dlCls=!row.onTime?'over':dLeft<=5?'tight':'';
+      const dlText=!row.onTime?fmtShort(row.deadline)+' &#9888;':'due '+fmtShort(row.deadline);
+      const hintText=isNext&&!doneToday?'<span class="srow-hint">&#10003; mark done</span>':'';
+
+      const rowCls='srow'+(isToday?' today-row':isPast?' past-row':'')+(row.onTime?'':' late-row');
+      html+='<div class="'+rowCls+'">'+
+        '<div class="srow-date">'+
+        '<div class="srow-date-main'+(isToday?' ist':'')+'">'+fmtRow(row.date)+'</div>'+
+        (isToday?'<div class="today-chip">TODAY</div>':'')+
+        '</div>'+
+        '<div class="srow-matter">'+row.matter+'</div>'+
+        '<div class="srow-sess">'+
+        '<span class="sess-badge" style="background:'+S_BG[si]+';color:'+S_CLR[si]+'">'+row.session+'</span>'+
+        '<span class="srow-spacer"></span>'+
+        hintText+
+        '<span class="srow-dl '+dlCls+'">'+dlText+'</span>'+
+        '</div>'+
+        '<div class="chk-wrap"><div class="'+chkCls+'" '+chkClick+' '+chkTitle+'></div></div>'+
+        '</div>';
+    });
+    if(sched.length>36)html+='<div style="text-align:center;padding:14px 0;font-size:10px;color:var(--hint);font-family:\'Courier New\',monospace;letter-spacing:1px">... and '+(sched.length-36)+' more session'+(sched.length-36!==1?'s':'')+' beyond this window</div>';
+  }
+
+  document.getElementById('schedule').innerHTML=html;
+  renderSide(totalDone,bookedDates);
+}
+
+function renderSide(totalDone,bookedDates){
+  /* Apps list */
+  let appsHTML='';
+  if(!apps.length){
+    appsHTML='<div class="apps-empty">No applications yet.</div>';
+  } else {
+    appsHTML=[...apps].sort((a,b)=>a.deadline.localeCompare(b.deadline)).map(a=>{
+      const done=doneCt(a.id),isComplete=done>=SESSIONS.length;
+      const dLeft=daysBetween(TODAY,a.deadline);
+      const dlStr=isComplete?'Complete':dLeft>=0?dLeft+'d to deadline':Math.abs(dLeft)+'d overdue';
+      const dlC=isComplete?'var(--green)':dLeft<0?'var(--red)':dLeft<=5?'var(--amber)':'var(--muted)';
+      return '<div class="app-item">'+
+        '<div class="app-top"><div class="app-mn">'+a.matter+'</div><button class="app-rm" onclick="removeApp(\''+a.id+'\')">&times;</button></div>'+
+        '<div class="app-meta">Call: '+fmtShort(a.callDay)+' &middot; Deadline: '+fmtShort(a.deadline)+'<br><span style="color:'+dlC+'">'+dlStr+'</span></div>'+
+        '<div class="prog-bars">'+SESSIONS.map((_,i)=>'<div class="prog-bar'+(i<done?' done':i===done&&!isComplete?' cur':'')+'"></div>').join('')+'</div>'+
+        '<div class="prog-names">'+SESS_S.map((s,i)=>'<div class="prog-name'+(i<done?' done':i===done&&!isComplete?' cur':'')+'">'+s+'</div>').join('')+'</div>'+
+        '</div>';
+    }).join('');
+  }
+  document.getElementById('apps-card').innerHTML=appsHTML;
+
+  /* OOO calendar (only if open) */
+  const togLbl=document.getElementById('ooo-tog-lbl');
+  togLbl.textContent=oooOpen?'▲ hide':(ooo.size?'▼ '+ooo.size+' blocked':'▼ show');
+
+  if(!oooOpen)return;
+  const cd=new Date(calMo.y,calMo.m,1);
+  document.getElementById('cal-lbl').textContent=cd.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const fw=cd.getDay(),off=fw===0?6:fw-1,dim=new Date(calMo.y,calMo.m+1,0).getDate();
+  const cells=[...Array(off).fill(null),...Array.from({length:dim},(_,k)=>k+1)];
+  document.getElementById('cal-grid').innerHTML=cells.map((day,i)=>{
+    if(!day)return'<div></div>';
+    const col=i%7,ds=toStr(new Date(calMo.y,calMo.m,day));
+    const wt=col<4,iO=ooo.has(ds),iT=ds===TODAY,iB=bookedDates.has(ds)&&!iO;
+    const cls=['cal-cell'];
+    if(col>=4)cls.push('');
+    else if(iO)cls.push('is-ooo');
+    else if(iB)cls.push('is-booked');
+    else if(wt)cls.push('wt');
+    if(iT)cls.push('is-today-cell');
+    return'<div class="'+cls.filter(Boolean).join(' ')+'" '+(wt?'onclick="togOoo(\''+ds+'\')"':'')+'>'+day+'</div>';
+  }).join('');
+  document.getElementById('ooo-ct').textContent=ooo.size?ooo.size+' day'+(ooo.size!==1?'s':'')+' blocked':'No OOO days set';
+  document.getElementById('clr-ooo-btn').style.display=ooo.size?'':'none';
+
+  /* Add button */
+  const m=document.getElementById('inp-m').value.trim();
+  const c=document.getElementById('inp-c').value;
+  const d=document.getElementById('inp-d').value;
+  document.getElementById('add-btn').disabled=!(m&&c&&d);
+}
+
+renderAll();
+</script>
+</body>
+</html>
