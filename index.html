@@ -125,14 +125,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .app-rm{background:none;border:none;color:var(--hint);font-size:16px;cursor:pointer;line-height:1;padding:0 2px;}
 .app-rm:hover{color:var(--red);}
 .app-meta{font-size:10px;color:var(--muted);line-height:1.65;margin-bottom:6px;}
-.prog-bars{display:flex;gap:2px;margin-bottom:2px;}
-.prog-bar{flex:1;height:3px;border-radius:2px;background:#e8e5de;}
-.prog-bar.done{background:var(--green);}
-.prog-bar.cur{background:var(--amber);}
-.prog-names{display:flex;gap:2px;}
-.prog-name{flex:1;font-size:7.5px;text-align:center;color:var(--hint);text-transform:uppercase;letter-spacing:.3px;overflow:hidden;white-space:nowrap;}
-.prog-name.done{color:var(--green);}
-.prog-name.cur{color:var(--amber);}
+.prog-cols{display:flex;gap:2px;margin-top:2px;}
+.prog-col{flex:1;min-width:0;padding:2px 1px 1px;border-radius:4px;transition:background .12s;}
+.prog-col-bar{height:3px;border-radius:2px;background:#e8e5de;margin-bottom:3px;}
+.prog-col-bar.done{background:var(--green);}
+.prog-col-bar.cur{background:var(--amber);}
+.prog-col-name{font-size:7.5px;text-align:center;color:var(--hint);text-transform:uppercase;letter-spacing:.3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.prog-col-name.done{color:var(--green);}
+.prog-col-name.cur{color:var(--amber);}
+.prog-col.clickable{cursor:pointer;}
+.prog-col.clickable:hover{background:#f0efe9;}
+.prog-col.cur.clickable:hover{background:#fff0cc;}
+.prog-col.done.clickable:hover{background:#edf7f0;}
 .apps-empty{padding:20px 14px;text-align:center;color:var(--muted);font-size:13px;}
 
 /* ── Add form ── */
@@ -174,8 +178,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .clr-btn:hover{color:var(--red);}
 
 /* ── Done-today banner ── */
-.done-today-bar{background:#edf7f0;border:0.5px solid rgba(31,92,56,.25);border-radius:9px;padding:10px 16px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--green);}
-.done-today-bar strong{font-family:'Courier New',monospace;}
+.done-today-bar{background:#edf7f0;border:0.5px solid rgba(31,92,56,.25);border-radius:9px;padding:10px 16px;margin-bottom:4px;font-size:12px;color:var(--green);}
+.done-today-item{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.done-today-item + .done-today-item{margin-top:6px;padding-top:6px;border-top:0.5px solid rgba(31,92,56,.18);}
+.done-today-item strong{font-family:'Courier New',monospace;}
 .undo-btn{background:none;border:0.5px solid rgba(31,92,56,.35);border-radius:5px;padding:3px 10px;font-size:11px;color:var(--green);cursor:pointer;font-family:inherit;}
 .undo-btn:hover{background:rgba(31,92,56,.06);}
 
@@ -284,26 +290,32 @@ const save=()=>{
 /* ── Helpers ──────────────────────────────────────────────── */
 // How many sessions are done for an app
 const doneCt=id=>(clog[id]||[]).length;
-// Was any session completed today?
-const anyDoneToday=()=>apps.some(a=>(clog[a.id]||[]).some(e=>e.date===TODAY));
-// What was completed today?
-const todayEntry=()=>{
+// Set of completed session indices for an app
+const doneSet=id=>new Set((clog[id]||[]).map(e=>e.sessIdx));
+// Lowest session index not yet completed (or SESSIONS.length if all done)
+const nextPending=id=>{
+  const s=doneSet(id);
+  for(let i=0;i<SESSIONS.length;i++)if(!s.has(i))return i;
+  return SESSIONS.length;
+};
+// All sessions completed today, in chronological order across apps
+const todayEntries=()=>{
+  const out=[];
   for(const a of apps){
-    const e=(clog[a.id]||[]).find(e=>e.date===TODAY);
-    if(e)return{app:a,entry:e};
+    (clog[a.id]||[]).forEach(e=>{if(e.date===TODAY)out.push({app:a,entry:e});});
   }
-  return null;
+  return out;
 };
 
 /* ── Scheduler ─────────────────────────────────────────────── */
 function buildSchedule(startFrom){
-  // Build per-app "next session index" from clog
-  const nextSess={};
-  apps.forEach(a=>{nextSess[a.id]=doneCt(a.id);});
-
-  const queue=apps
-    .filter(a=>nextSess[a.id]<SESSIONS.length)
-    .map(a=>({...a,nextIdx:nextSess[a.id],rem:SESSIONS.slice(nextSess[a.id]).map((name,i)=>({name,idx:nextSess[a.id]+i}))}));
+  // For each app, list its still-pending sessions in original order
+  const queue=apps.map(a=>{
+    const s=doneSet(a.id);
+    const rem=[];
+    for(let i=0;i<SESSIONS.length;i++)if(!s.has(i))rem.push({name:SESSIONS[i],idx:i});
+    return{...a,nextIdx:rem.length?rem[0].idx:SESSIONS.length,rem};
+  }).filter(q=>q.rem.length>0);
 
   const sched=[];
   let cur=startFrom,g=0;
@@ -322,31 +334,24 @@ function buildSchedule(startFrom){
 }
 
 /* ── Actions ────────────────────────────────────────────────── */
-function markDone(appId){
-  const done=doneCt(appId);
-  if(done>=SESSIONS.length)return;
+function markDone(appId,sessIdx){
+  if(sessIdx===undefined)sessIdx=nextPending(appId);
+  if(sessIdx<0||sessIdx>=SESSIONS.length)return;
   if(!clog[appId])clog[appId]=[];
-  clog[appId].push({sessIdx:done,date:TODAY});
+  if(clog[appId].some(e=>e.sessIdx===sessIdx))return;
+  clog[appId].push({sessIdx,date:TODAY});
   save();renderAll();
 }
 
-function undoToday(){
-  const te=todayEntry();
-  if(!te)return;
-  clog[te.app.id]=(clog[te.app.id]||[]).filter(e=>e.date!==TODAY);
+function undoEntry(appId,sessIdx){
+  clog[appId]=(clog[appId]||[]).filter(e=>!(e.sessIdx===sessIdx&&e.date===TODAY));
   save();renderAll();
 }
 
 function reopenSess(appId,sessIdx){
   const app=apps.find(a=>a.id===appId);
-  const totalDone=doneCt(appId);
-  const later=totalDone-(sessIdx+1);
-  const msg=later>0
-    ?`Reopen "${SESSIONS[sessIdx]}" for ${app?.matter}?\n\nThis will also undo the ${later} later session${later!==1?'s':''}.`
-    :`Reopen "${SESSIONS[sessIdx]}" for ${app?.matter}?`;
-  if(!confirm(msg))return;
-  // Remove this session and all after it
-  clog[appId]=(clog[appId]||[]).filter(e=>e.sessIdx<sessIdx);
+  if(!confirm(`Reopen "${SESSIONS[sessIdx]}" for ${app?.matter}?`))return;
+  clog[appId]=(clog[appId]||[]).filter(e=>e.sessIdx!==sessIdx);
   save();renderAll();
 }
 
@@ -382,10 +387,7 @@ function clrOoo(){ooo=new Set();save();renderAll();}
 
 /* ── Render ─────────────────────────────────────────────────── */
 function renderAll(){
-  const doneToday=anyDoneToday();
-  const te=todayEntry();
-  // Forward schedule starts from today; if something done today, still show from today
-  // but checkboxes for other apps will be disabled
+  const todayList=todayEntries();
   const sched=buildSchedule(TODAY);
   const bookedDates=new Set(sched.map(s=>s.date));
   const conflicts=sched.filter(s=>!s.onTime);
@@ -414,8 +416,11 @@ function renderAll(){
 
   /* Done-today bar */
   let dtHTML='';
-  if(te){
-    dtHTML='<div class="done-today-bar"><span>&#10003; <strong>'+te.app.matter+'</strong> &mdash; '+SESSIONS[te.entry.sessIdx]+' completed today</span><button class="undo-btn" onclick="undoToday()">Undo</button></div>';
+  if(todayList.length){
+    dtHTML='<div class="done-today-bar">'+todayList.map(te=>
+      '<div class="done-today-item"><span>&#10003; <strong>'+te.app.matter+'</strong> &mdash; '+SESSIONS[te.entry.sessIdx]+' completed today</span>'+
+      '<button class="undo-btn" onclick="undoEntry(\''+te.app.id+'\','+te.entry.sessIdx+')">Undo</button></div>'
+    ).join('')+'</div>';
   }
   document.getElementById('done-today-wrap').innerHTML=dtHTML;
 
@@ -469,31 +474,28 @@ function renderAll(){
       const isToday=row.date===TODAY;
       const isPast=row.date<TODAY;
 
-      // Determine checkbox state
-      // A session is checkable if it's the "next" for its app AND no other session was done today
-      // (or the done-today session IS this one — but that's handled by pastRows)
+      // The schedule is a linear view: only the next-scheduled session for each
+      // matter is checkable here. Out-of-order completion is available in the
+      // Applications list.
       const isNext=row.isNext;
       let chkCls='chk';
       let chkClick='';
       let chkTitle='';
-      if(isNext&&!doneToday){
-        chkClick='onclick="markDone(\''+row.appId+'\')"';
+      if(isNext){
+        chkClick='onclick="markDone(\''+row.appId+'\','+row.sessIdx+')"';
         chkTitle='title="Mark complete"';
-      } else if(isNext&&doneToday){
-        chkCls='chk disabled';
-        chkTitle='title="Already completed a session today"';
       } else if(isPast){
         chkCls='chk missed';
-        chkTitle='title="Complete earlier sessions for this matter first"';
+        chkTitle='title="Earlier scheduled session for this matter still pending"';
       } else {
         chkCls='chk disabled';
-        chkTitle='title="Complete earlier sessions for this matter first"';
+        chkTitle='title="Mark out of order from the Applications list if needed"';
       }
 
       const dLeft=daysBetween(TODAY,row.deadline);
       const dlCls=!row.onTime?'over':dLeft<=5?'tight':'';
       const dlText=!row.onTime?fmtShort(row.deadline)+' &#9888;':'due '+fmtShort(row.deadline);
-      const hintText=isNext&&!doneToday?'<span class="srow-hint">&#10003; mark done</span>':'';
+      const hintText=isNext?'<span class="srow-hint">&#10003; mark done</span>':'';
 
       const rowCls='srow'+(isToday?' today-row':isPast?' past-row':'')+(row.onTime?'':' late-row');
       html+='<div class="'+rowCls+'">'+
@@ -526,14 +528,32 @@ function renderSide(totalDone,bookedDates){
   } else {
     appsHTML=[...apps].sort((a,b)=>a.deadline.localeCompare(b.deadline)).map(a=>{
       const done=doneCt(a.id),isComplete=done>=SESSIONS.length;
+      const doneS=doneSet(a.id);
+      const nextP=nextPending(a.id);
       const dLeft=daysBetween(TODAY,a.deadline);
       const dlStr=isComplete?'Complete':dLeft>=0?dLeft+'d to deadline':Math.abs(dLeft)+'d overdue';
       const dlC=isComplete?'var(--green)':dLeft<0?'var(--red)':dLeft<=5?'var(--amber)':'var(--muted)';
+      const progHTML=SESSIONS.map((_,i)=>{
+        const isDone=doneS.has(i);
+        const isCur=!isDone&&i===nextP;
+        const stateCls=(isDone?' done':isCur?' cur':'');
+        let click,title;
+        if(isDone){
+          click=' onclick="reopenSess(\''+a.id+'\','+i+')"';
+          title=' title="Reopen '+SESSIONS[i]+'"';
+        } else {
+          click=' onclick="markDone(\''+a.id+'\','+i+')"';
+          title=' title="Mark '+SESSIONS[i]+' complete"';
+        }
+        return '<div class="prog-col clickable'+stateCls+'"'+click+title+'>'+
+          '<div class="prog-col-bar'+stateCls+'"></div>'+
+          '<div class="prog-col-name'+stateCls+'">'+SESS_S[i]+'</div>'+
+          '</div>';
+      }).join('');
       return '<div class="app-item">'+
         '<div class="app-top"><div class="app-mn">'+a.matter+'</div><button class="app-rm" onclick="removeApp(\''+a.id+'\')">&times;</button></div>'+
         '<div class="app-meta">Call: '+fmtShort(a.callDay)+' &middot; Deadline: '+fmtShort(a.deadline)+'<br><span style="color:'+dlC+'">'+dlStr+'</span></div>'+
-        '<div class="prog-bars">'+SESSIONS.map((_,i)=>'<div class="prog-bar'+(i<done?' done':i===done&&!isComplete?' cur':'')+'"></div>').join('')+'</div>'+
-        '<div class="prog-names">'+SESS_S.map((s,i)=>'<div class="prog-name'+(i<done?' done':i===done&&!isComplete?' cur':'')+'">'+s+'</div>').join('')+'</div>'+
+        '<div class="prog-cols">'+progHTML+'</div>'+
         '</div>';
     }).join('');
   }
