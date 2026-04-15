@@ -539,6 +539,12 @@ function renderSide(totalDone,bookedDates){
   }
   document.getElementById('apps-card').innerHTML=appsHTML;
 
+  /* Add button */
+  const m=document.getElementById('inp-m').value.trim();
+  const c=document.getElementById('inp-c').value;
+  const d=document.getElementById('inp-d').value;
+  document.getElementById('add-btn').disabled=!(m&&c&&d);
+
   /* OOO calendar (only if open) */
   const togLbl=document.getElementById('ooo-tog-lbl');
   togLbl.textContent=oooOpen?'▲ hide':(ooo.size?'▼ '+ooo.size+' blocked':'▼ show');
@@ -562,12 +568,6 @@ function renderSide(totalDone,bookedDates){
   }).join('');
   document.getElementById('ooo-ct').textContent=ooo.size?ooo.size+' day'+(ooo.size!==1?'s':'')+' blocked':'No OOO days set';
   document.getElementById('clr-ooo-btn').style.display=ooo.size?'':'none';
-
-  /* Add button */
-  const m=document.getElementById('inp-m').value.trim();
-  const c=document.getElementById('inp-c').value;
-  const d=document.getElementById('inp-d').value;
-  document.getElementById('add-btn').disabled=!(m&&c&&d);
 }
 
 renderAll();
