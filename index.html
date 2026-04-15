@@ -6,22 +6,22 @@
   <title>Patent Workflow Scheduler</title>
   <style>
     :root {
-      --bg: #0b1020;
-      --panel: #11182c;
-      --panel-2: #17203a;
-      --panel-3: #1f2b4b;
-      --text: #e8edf7;
-      --muted: #9aa8c7;
-      --line: rgba(255,255,255,0.08);
-      --green: #19c37d;
-      --green-2: #0f9f64;
-      --amber: #f4b740;
-      --red: #ef5f67;
-      --blue: #6ea8fe;
-      --shadow: 0 16px 40px rgba(0,0,0,0.35);
-      --radius: 18px;
-      --radius-sm: 12px;
-      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --bg: #101114;
+      --panel: #181a1f;
+      --panel-2: #1f2127;
+      --panel-3: #242730;
+      --text: #f1f0ea;
+      --muted: #c2beaf;
+      --line: rgba(241, 240, 234, 0.25);
+      --green: #bac8a4;
+      --green-2: #8fa07b;
+      --amber: #d6b672;
+      --red: #b17878;
+      --blue: #aab6c6;
+      --shadow: 0 2px 0 rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.04) inset;
+      --radius: 2px;
+      --radius-sm: 2px;
+      --font: "IBM Plex Mono", "Courier New", Courier, monospace;
     }
 
     * { box-sizing: border-box; }
@@ -136,11 +136,6 @@
       font-size: 0.92rem;
     }
 
-    .chip.green { background: rgba(25, 195, 125, 0.16); color: #d8fff0; border-color: rgba(25,195,125,0.35); }
-    .chip.amber { background: rgba(244, 183, 64, 0.16); color: #fff0c6; border-color: rgba(244,183,64,0.35); }
-    .chip.red { background: rgba(239, 95, 103, 0.16); color: #ffd8da; border-color: rgba(239,95,103,0.35); }
-    .chip.blue { background: rgba(110, 168, 254, 0.16); color: #dce9ff; border-color: rgba(110,168,254,0.35); }
-
     .today-copy {
       color: #dae3f7;
       line-height: 1.6;
@@ -195,8 +190,6 @@
       font-weight: 600;
     }
 
-    .stage-pill.done { background: rgba(25,195,125,0.18); color: #d8fff0; border-color: rgba(25,195,125,0.33); }
-    .stage-pill.current { background: rgba(244,183,64,0.18); color: #fff0c6; border-color: rgba(244,183,64,0.33); }
     .stage-pill.pending { background: rgba(255,255,255,0.03); }
 
     .warning {
@@ -463,7 +456,6 @@
     .day.today { outline: 2px solid rgba(110,168,254,0.55); }
     .day.workable { cursor: pointer; }
     .day.workable:hover { background: rgba(255,255,255,0.06); }
-    .day.ooo { background: rgba(239,95,103,0.12); border-color: rgba(239,95,103,0.28); }
     .day.booked { box-shadow: inset 0 0 0 1px rgba(25,195,125,0.23); }
     .day-number { font-size: 0.88rem; font-weight: 700; }
     .day-flags { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -475,9 +467,6 @@
       border: 1px solid rgba(255,255,255,0.05);
       color: #d7e3fb;
     }
-
-    .dot.booked { background: rgba(25,195,125,0.18); color: #d8fff0; border-color: rgba(25,195,125,0.3); }
-    .dot.ooo { background: rgba(239,95,103,0.18); color: #ffd8da; border-color: rgba(239,95,103,0.3); }
 
     .footer-note {
       margin-top: 14px;
@@ -520,26 +509,7 @@
       .day { min-height: 72px; }
     }
 
-    /* 1960s NASA mission-control inspired theme overrides */
-    :root {
-      --bg: #101114;
-      --panel: #181a1f;
-      --panel-2: #1f2127;
-      --panel-3: #242730;
-      --text: #f1f0ea;
-      --muted: #c2beaf;
-      --line: rgba(241, 240, 234, 0.25);
-      --green: #bac8a4;
-      --green-2: #8fa07b;
-      --amber: #d6b672;
-      --red: #b17878;
-      --blue: #aab6c6;
-      --radius: 2px;
-      --radius-sm: 2px;
-      --shadow: 0 2px 0 rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.04) inset;
-      --font: "IBM Plex Mono", "Courier New", Courier, monospace;
-    }
-
+    /* 1960s NASA mission-control aesthetic */
     html, body {
       background:
         linear-gradient(rgba(255,255,255,0.02), rgba(255,255,255,0.02)),
@@ -614,10 +584,6 @@
     .stage-pill.current, .chip.amber { background: #443a29; color: #f7ead0; border-color: #7e6a40; }
     .chip.red, .dot.ooo, .day.ooo, .warning { background: #432b2f; color: #f8dfe1; border-color: #84565e; }
     .chip.blue { background: #303847; color: #dce6f7; border-color: #5e708b; }
-
-    .table-wrap table, th, td {
-      border-color: rgba(241,240,234,0.23) !important;
-    }
 
     .eyebrow, .stat-label {
       letter-spacing: 0.14em;
