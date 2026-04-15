@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Patent Mission Procedures Console</title>
+<title>Console</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -182,14 +182,13 @@ body::before{
 
 <div class="topbar">
   <div class="topbar-brand">
-    <span class="topbar-eyebrow">Tom Sachs Field Lab // NASA</span>
-    <span class="topbar-title">Mission Procedures Console</span>
+    <span class="topbar-eyebrow">Planner</span>
   </div>
   <div class="topbar-stats">
     <div class="tstat"><span class="tstat-l">Today</span><span id="hdr-date" class="tstat-v mono" style="font-size:12px"></span></div>
     <div class="tstat"><span class="tstat-l">Apps</span><span id="hdr-apps" class="tstat-v">0</span></div>
     <div class="tstat"><span class="tstat-l">Left</span><span id="hdr-left" class="tstat-v">0</span></div>
-    <div class="tstat"><span class="tstat-l">Mission Risk</span><span id="hdr-oob" class="tstat-v">0</span></div>
+    <div class="tstat"><span class="tstat-l">Risk</span><span id="hdr-oob" class="tstat-v">0</span></div>
   </div>
 </div>
 
@@ -201,11 +200,11 @@ body::before{
   </div>
   <div class="col-side">
     <div>
-      <div class="sec-label" style="margin-top:0">Mission Manifest</div>
+      <div class="sec-label" style="margin-top:0">Application List</div>
       <div class="card" id="apps-card"></div>
     </div>
     <div class="add-card">
-      <div class="add-title">Log New Mission Packet</div>
+      <div class="add-title">Log New Application</div>
       <div class="field"><label>Matter Number</label><input type="text" id="inp-m" class="mono" placeholder="1234-123" maxlength="24" oninput="renderAll()" onkeydown="if(event.key==='Enter')addApp()"></div>
       <div class="field"><label>Call Day</label><input type="date" id="inp-c" oninput="renderAll()"></div>
       <div class="field"><label>Deadline</label><input type="date" id="inp-d" oninput="renderAll()"></div>
@@ -213,7 +212,7 @@ body::before{
     </div>
     <div class="card">
       <button class="ooo-tog-btn" onclick="toggleOoo()">
-        Mission Blackout Days
+        Calendar
         <span id="ooo-tog-lbl" style="font-size:10px;color:var(--hint);font-family:'Courier New',monospace">▼ show</span>
       </button>
       <div id="ooo-body" style="display:none">
@@ -398,7 +397,7 @@ function renderAll(){
   if(conflictMatters.length>0){
     const byM={};
     conflicts.forEach(c=>{if(!byM[c.matter])byM[c.matter]={matter:c.matter,deadline:c.deadline,sessions:[]};byM[c.matter].sessions.push(c.session);});
-    confHTML='<div class="conf"><div class="conf-hdr">&#9888; Mission Risk &mdash; '+conflictMatters.length+' application'+(conflictMatters.length!==1?'s cannot':'  cannot')+' meet their deadline</div>'+
+    confHTML='<div class="conf"><div class="conf-hdr">&#9888; Risk &mdash; '+conflictMatters.length+' application'+(conflictMatters.length!==1?'s cannot':'  cannot')+' meet their deadline</div>'+
       Object.values(byM).map(x=>'<div class="conf-item"><span class="conf-mn">'+x.matter+'</span> &mdash; '+x.sessions.length+' session'+(x.sessions.length!==1?'s':'')+' fall past deadline of <strong>'+fmtShort(x.deadline)+'</strong>: '+x.sessions.join(', ')+'.</div>').join('')+
       '</div>';
   }
